@@ -100,7 +100,7 @@ export function createCli(): Command {
     .description("Start the current project in the background and open its board")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
-      const config = await loadProjectConfig(options.root);
+      const config = await loadOrInitializeProject(options.root);
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
       if (config.server.openBrowser) await exec("open", [result.url]);
       process.stdout.write(`Codex Runners started in the background.\n${result.url}\n`);
@@ -116,7 +116,7 @@ export function createCli(): Command {
     .description("Restart the current project in the background and reopen its board")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
-      const config = await loadProjectConfig(options.root);
+      const config = await loadOrInitializeProject(options.root);
       process.stdout.write(`Restarting Codex Runners · ${config.project.name}…\n`);
       await stopDaemon(userRuntimeRoot());
       await waitForProjectSessionEnd(config.project.repositoryRoot);
@@ -141,7 +141,7 @@ export function createCli(): Command {
     .description("Open this project in Codex Runners")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
-      const config = await loadProjectConfig(options.root);
+      const config = await loadOrInitializeProject(options.root);
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
       await exec("open", [result.url]);
     });
@@ -159,7 +159,7 @@ export function createCli(): Command {
     .description("Chat with the persistent Donna project manager")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
-      const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(options.root), "utf8")));
+      const config = await loadOrInitializeProject(options.root);
       await runDonnaClient(config);
     });
 
@@ -174,6 +174,22 @@ async function readStdin(): Promise<string> {
 
 async function loadProjectConfig(root: string) {
   return ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(root), "utf8")));
+}
+
+async function loadOrInitializeProject(root: string) {
+  try {
+    return await loadProjectConfig(root);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    const result = await initializeProject(root, {
+      pluginRoot: pluginRootFromModule(import.meta.url),
+      nodePath: process.execPath,
+      integrationBranch: "dev",
+      bootstrapRepository: true
+    });
+    process.stdout.write(`Initialized Codex Runners · ${result.config.project.name}\n`);
+    return result.config;
+  }
 }
 
 function daemonDependencies(cliPath: string) {
@@ -202,9 +218,10 @@ if (isMainModule(import.meta.url)) {
     if (error instanceof ProjectSessionError) {
       process.stderr.write(`error: ${error.message}\n`);
       process.exitCode = 1;
-    } else {
-      throw error;
-    }
+    } else if (error instanceof Error) {
+      process.stderr.write(`error: ${error.message}\n`);
+      process.exitCode = 1;
+    } else throw error;
   }
 }
 

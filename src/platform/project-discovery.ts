@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 
@@ -44,4 +45,34 @@ export async function discoverRepository(inputPath: string, integrationBranch = 
   const currentBranch = await git(repositoryRoot, ["branch", "--show-current"]);
   const name = path.basename(repositoryRoot);
   return { repositoryRoot, currentBranch, integrationBranch, name };
+}
+
+export async function ensureRepository(inputPath: string, integrationBranch = "dev") {
+  const requestedRoot = path.resolve(inputPath);
+  await mkdir(requestedRoot, { recursive: true });
+  let repositoryRoot: string;
+  try {
+    repositoryRoot = path.resolve(await git(requestedRoot, ["rev-parse", "--show-toplevel"]));
+  } catch {
+    await git(requestedRoot, ["init", "-b", "main"]);
+    repositoryRoot = requestedRoot;
+  }
+
+  try {
+    await git(repositoryRoot, ["rev-parse", "--verify", "HEAD"]);
+  } catch {
+    await git(repositoryRoot, [
+      "-c", "user.name=Codex Runners",
+      "-c", "user.email=codex-runners@localhost",
+      "commit", "--allow-empty", "-m", "chore: initialize project"
+    ]);
+  }
+
+  try {
+    await git(repositoryRoot, ["rev-parse", "--verify", `refs/heads/${integrationBranch}`]);
+  } catch {
+    await git(repositoryRoot, ["branch", integrationBranch, "HEAD"]);
+  }
+
+  return discoverRepository(repositoryRoot, integrationBranch);
 }

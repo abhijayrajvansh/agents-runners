@@ -3,7 +3,7 @@ import path from "node:path";
 
 import { ProjectConfigSchema, type ProjectConfig } from "../domain/schema.js";
 import { AtomicJsonStore, StoreError } from "../storage/atomic-json-store.js";
-import { discoverRepository } from "../platform/project-discovery.js";
+import { discoverRepository, ensureRepository } from "../platform/project-discovery.js";
 import { projectConfigPath, projectRuntimePath } from "../platform/paths.js";
 import { createProjectConfig } from "./config-template.js";
 import { appendUniqueLines, mergeSessionStartHook, replaceManagedBlock } from "./managed-files.js";
@@ -12,6 +12,7 @@ export type InitializeOptions = {
   pluginRoot: string;
   nodePath?: string;
   integrationBranch?: string;
+  bootstrapRepository?: boolean;
 };
 
 export type InitResult = {
@@ -43,7 +44,9 @@ async function writeIfChanged(file: string, contents: string): Promise<"created"
 }
 
 export async function initializeProject(inputPath: string, options: InitializeOptions): Promise<InitResult> {
-  const repository = await discoverRepository(inputPath, options.integrationBranch ?? "dev");
+  const repository = options.bootstrapRepository
+    ? await ensureRepository(inputPath, options.integrationBranch ?? "dev")
+    : await discoverRepository(inputPath, options.integrationBranch ?? "dev");
   const root = repository.repositoryRoot;
   const created: string[] = [];
   const updated: string[] = [];
