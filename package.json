@@ -8,9 +8,7 @@
     "node": ">=22"
   },
   "bin": {
-    "codex-runners": "dist/bin/cli.mjs",
-    "codex-runners-start": "dist/bin/start.mjs",
-    "codex-runners-stop": "dist/bin/stop.mjs"
+    "codex-runners": "dist/bin/cli.mjs"
   },
   "scripts": {
     "build": "npm run build:node && npm run build:web",

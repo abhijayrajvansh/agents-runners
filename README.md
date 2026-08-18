@@ -46,16 +46,12 @@ The SessionStart hook reuses or starts the loopback daemon, registers the projec
 ## Daily use
 
 ```bash
-codex-runners-start
-codex-runners-stop
-
-# Equivalent full CLI commands
 codex-runners start
 codex-runners stop
 codex-runners restart
 ```
 
-Run either start/stop command style from an initialized project repository. `codex-runners-start` and `codex-runners start` start or reuse the shared daemon, register the current project, open its board, and immediately return to the shell while work continues in the background. Repeated starts reuse the same daemon and project. `codex-runners-stop` and `codex-runners stop` shut down the background daemon. `codex-runners restart` stops the current daemon, clears any legacy foreground session, then reopens the same project in the background. All lifecycle commands preserve tickets, branches, worktrees, tmux panes, and Codex thread IDs.
+Run lifecycle commands from a project folder. `codex-runners start` starts or reuses the shared daemon, registers the current project, opens its board, and immediately returns to the shell while work continues in the background. Repeated starts reuse the same daemon and project. `codex-runners stop` shuts down the background daemon. `codex-runners restart` stops the current daemon, clears any legacy foreground session, then reopens the same project in the background. All lifecycle commands preserve tickets, branches, worktrees, tmux panes, and Codex thread IDs.
 
 The full CLI remains available for diagnostics and Donna:
 

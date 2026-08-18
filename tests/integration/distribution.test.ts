@@ -38,17 +38,13 @@ describe("plugin distribution", () => {
     });
     expect(mcp.mcpServers).toHaveProperty("codex-runners");
     expect(packageJson.bin).toEqual({
-      "codex-runners": "dist/bin/cli.mjs",
-      "codex-runners-start": "dist/bin/start.mjs",
-      "codex-runners-stop": "dist/bin/stop.mjs"
+      "codex-runners": "dist/bin/cli.mjs"
     });
     expect(skill).toMatch(/^---\nname: codex-runners\ndescription: Use when /);
     expect(agent).toContain('default_prompt: "Use $codex-runners');
     expect(license).toContain("MIT License");
     await expect(access(path.join(root, "dist/bin/cli.mjs"))).resolves.toBeUndefined();
     await expect(access(path.join(root, "dist/bin/mcp.mjs"))).resolves.toBeUndefined();
-    await expect(access(path.join(root, "dist/bin/start.mjs"))).resolves.toBeUndefined();
-    await expect(access(path.join(root, "dist/bin/stop.mjs"))).resolves.toBeUndefined();
     await expect(access(path.join(root, "dist/public/index.html"))).resolves.toBeUndefined();
   });
 
