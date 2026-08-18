@@ -7,12 +7,13 @@ import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 export type TicketDrawerProps = {
   open: boolean;
   ticket: Ticket | null;
+  tickets: Ticket[];
   runners: RunnerRecord[];
   onClose(): void;
   onSave(ticket: Partial<Ticket> & { id?: string }): Promise<void>;
 };
 
-export function TicketDrawer({ open, ticket, runners, onClose, onSave }: TicketDrawerProps) {
+export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }: TicketDrawerProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TicketStatus>("backlog");
@@ -33,7 +34,8 @@ export function TicketDrawer({ open, ticket, runners, onClose, onSave }: TicketD
   }, [ticket, open]);
 
   if (!open) return null;
-  const needsHumanInput = ticket?.status === "blocked" && ticket.blocker?.kind !== "dependency";
+  const waitingForDependencies = Boolean(ticket?.dependencies.some(id => tickets.find(candidate => candidate.id === id)?.status !== "done"));
+  const needsHumanInput = ticket?.status === "blocked" && (ticket.blocker?.kind ?? (waitingForDependencies ? "dependency" : "human_input")) === "human_input";
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim() || saving) return;

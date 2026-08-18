@@ -17,6 +17,7 @@ const labels: Record<TicketStatus, string> = {
 export type ColumnProps = {
   status: TicketStatus;
   tickets: Ticket[];
+  allTickets: Ticket[];
   runners: RunnerRecord[];
   revision: number;
   onMove(ticketId: string, status: TicketStatus, expectedRevision: number): Promise<void> | void;
@@ -24,7 +25,7 @@ export type ColumnProps = {
   compactCards: boolean;
 };
 
-export function Column({ status, tickets, runners, revision, onMove, onOpenTicket, compactCards }: ColumnProps) {
+export function Column({ status, tickets, allTickets, runners, revision, onMove, onOpenTicket, compactCards }: ColumnProps) {
   const droppable = useDroppable({ id: status });
   return (
     <section
@@ -48,6 +49,7 @@ export function Column({ status, tickets, runners, revision, onMove, onOpenTicke
             onMove={onMove}
             onOpen={onOpenTicket}
             compact={compactCards}
+            blockerKind={ticket.dependencies.some(id => allTickets.find(candidate => candidate.id === id)?.status !== "done") ? "dependency" : "human_input"}
           />
         ))}
         {tickets.length === 0 && <div className="column-empty">No tickets</div>}

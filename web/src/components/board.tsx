@@ -30,6 +30,7 @@ export function Board({ project, runners, onMove, onOpenTicket, compactCards = f
               key={status}
               status={status}
               tickets={project.board.tickets.filter(ticket => ticket.status === status)}
+              allTickets={project.board.tickets}
               runners={runners}
               revision={project.board.revision}
               onMove={onMove}

@@ -31,9 +31,10 @@ export type TicketCardProps = {
   onMove(ticketId: string, status: TicketStatus, expectedRevision: number): Promise<void> | void;
   onOpen(ticketId: string): void;
   compact: boolean;
+  blockerKind?: "dependency" | "human_input";
 };
 
-export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact }: TicketCardProps) {
+export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, blockerKind }: TicketCardProps) {
   const draggable = useDraggable({ id: ticket.id, data: { ticket } });
   const upcoming = nextStatus[ticket.status];
   const style = {
@@ -77,10 +78,10 @@ export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact }
       </button>
       {ticket.status === "blocked" && (
         <span
-          className={`blocker-tag blocker-tag--${ticket.blocker?.kind ?? "human_input"}`}
+          className={`blocker-tag blocker-tag--${ticket.blocker?.kind ?? blockerKind ?? "human_input"}`}
           title={ticket.blocker?.reason}
         >
-          {ticket.blocker?.kind === "dependency" ? "Waiting for tickets" : "Needs human input"}
+          {(ticket.blocker?.kind ?? blockerKind) === "dependency" ? "Waiting for tickets" : "Needs human input"}
         </span>
       )}
       {!compact && ticket.description && <p>{ticket.description}</p>}

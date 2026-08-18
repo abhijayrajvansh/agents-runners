@@ -134,6 +134,7 @@ export function App() {
       <TicketDrawer
         open={drawerOpen}
         ticket={selectedTicket}
+        tickets={state.project.board.tickets}
         runners={state.runners}
         onClose={() => setDrawerOpen(false)}
         onSave={state.saveTicket}
