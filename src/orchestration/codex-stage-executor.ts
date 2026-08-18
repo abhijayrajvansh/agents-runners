@@ -88,12 +88,10 @@ export function parseStageResult(message: string): StageExecutionResult {
   for (const candidate of candidates) {
     try {
       const parsed = JSON.parse(candidate.trim()) as Record<string, unknown>;
-      const outcome = parsed.outcome;
-      if (outcome !== "passed" && outcome !== "failed" && outcome !== "blocked") continue;
+      const outcome = normalizeOutcome(parsed.outcome);
+      if (!outcome) continue;
       const summary = typeof parsed.summary === "string" ? parsed.summary : "Stage completed";
-      const findings = Array.isArray(parsed.findings)
-        ? parsed.findings.filter((value): value is string => typeof value === "string")
-        : [];
+      const findings = normalizeFindings(parsed.findings);
       return { kind: outcome, summary, findings };
     } catch {
       // Codex may include prose before its structured final line.
@@ -104,6 +102,24 @@ export function parseStageResult(message: string): StageExecutionResult {
     summary: "Runner did not return a valid structured result",
     findings: message ? [message] : ["No final runner message was returned."]
   };
+}
+
+function normalizeOutcome(value: unknown): StageExecutionResult["kind"] | null {
+  if (typeof value !== "string") return null;
+  const outcome = value.trim().toLowerCase().replaceAll("-", "_").replaceAll(" ", "_");
+  if (["passed", "completed", "complete", "success", "successful", "approved"].includes(outcome)) return "passed";
+  if (["failed", "failure", "changes_requested", "rejected"].includes(outcome)) return "failed";
+  if (outcome === "blocked") return "blocked";
+  return null;
+}
+
+function normalizeFindings(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+  if (!value || typeof value !== "object") return [];
+  return Object.entries(value).map(([key, item]) => {
+    if (Array.isArray(item)) return `${key}: ${item.map(String).join(", ")}`;
+    return `${key}: ${String(item)}`;
+  });
 }
 
 function paneFor(input: StageExecution): TmuxPane {

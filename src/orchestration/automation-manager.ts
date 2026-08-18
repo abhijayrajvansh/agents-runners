@@ -18,6 +18,9 @@ type ProjectAutomation = {
   pools: Map<RoleName, RunnerPool>;
   scheduler: Scheduler;
   unsubscribe: () => void;
+  heartbeat: ReturnType<typeof setInterval>;
+  reconcilePromise: Promise<void> | null;
+  rerun: boolean;
 };
 
 export class AutomationManager {
@@ -77,7 +80,9 @@ export class AutomationManager {
     const executor = new PreparedStageExecutor(this.worktrees, codexExecutor);
     const scheduler = new Scheduler({ registry: this.registry, events: this.events, runtime, pools, executor });
     const unsubscribe = this.events.subscribe(projectId, event => this.#handleEvent(projectId, event));
-    this.#projects.set(projectId, { runtime, pools, scheduler, unsubscribe });
+    const heartbeat = setInterval(() => this.reconcile(projectId), 2_000);
+    heartbeat.unref();
+    this.#projects.set(projectId, { runtime, pools, scheduler, unsubscribe, heartbeat, reconcilePromise: null, rerun: false });
     for (const ticket of config.board.tickets.filter(candidate => candidate.status === "blocked")) {
       this.#notifyBlocker(projectId, ticket);
     }
@@ -87,13 +92,25 @@ export class AutomationManager {
   reconcile(projectId: string): void {
     const automation = this.#projects.get(projectId);
     if (!automation) return;
-    void automation.scheduler.reconcile(projectId).catch(error => {
+    if (automation.reconcilePromise) {
+      automation.rerun = true;
+      return;
+    }
+    automation.reconcilePromise = (async () => {
+      do {
+        automation.rerun = false;
+        await automation.scheduler.reconcile(projectId);
+      } while (automation.rerun && this.#projects.has(projectId));
+    })().catch(error => {
+      if (!this.#projects.has(projectId)) return;
       this.events.publish({
         type: "automation.error",
         projectId,
         revision: this.registry.getBoard(projectId).revision,
         payload: { message: error instanceof Error ? error.message : String(error) }
       });
+    }).finally(() => {
+      automation.reconcilePromise = null;
     });
   }
 
@@ -115,13 +132,19 @@ export class AutomationManager {
   }
 
   close(): void {
-    for (const project of this.#projects.values()) project.unsubscribe();
+    for (const project of this.#projects.values()) {
+      project.unsubscribe();
+      clearInterval(project.heartbeat);
+    }
     this.#projects.clear();
   }
 
   async unregister(projectId: string): Promise<void> {
     const automation = this.#projects.get(projectId);
-    if (automation) automation.unsubscribe();
+    if (automation) {
+      automation.unsubscribe();
+      clearInterval(automation.heartbeat);
+    }
     this.#projects.delete(projectId);
     await this.tmux.killSession(sessionName(projectId)).catch(() => undefined);
   }

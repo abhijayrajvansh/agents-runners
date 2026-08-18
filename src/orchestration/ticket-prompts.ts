@@ -34,6 +34,6 @@ export function buildStagePrompt(
     ticket.qaInstructions,
     project.pools[runner.role].instructions,
     ...roleInstructions,
-    "Use Codex Runners MCP progress tools while working. Return a final JSON object with outcome, summary, and findings."
+    "Use Codex Runners MCP progress tools while working. Return a final JSON object with outcome, summary, and findings. Outcome must be exactly passed, failed, or blocked."
   ].filter(Boolean).join("\n\n");
 }
