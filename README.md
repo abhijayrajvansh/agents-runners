@@ -48,9 +48,13 @@ The SessionStart hook reuses or starts the loopback daemon, registers the projec
 ```bash
 codex-runners-start
 codex-runners-stop
+
+# Equivalent full CLI commands
+codex-runners start
+codex-runners stop
 ```
 
-Run either shortcut from an initialized project repository. `codex-runners-start` opens the board and stays attached as a live activity log. A project can have only one attached session. Pressing `Ctrl+C` stops the shared daemon and exits cleanly. `codex-runners-stop` performs the same shutdown from another terminal while preserving tickets, branches, worktrees, tmux panes, and Codex thread IDs.
+Run either command style from an initialized project repository. `codex-runners-start` and `codex-runners start` open the board and stay attached as a live activity log. A project can have only one attached session. Pressing `Ctrl+C` stops the shared daemon and exits cleanly. `codex-runners-stop` and `codex-runners stop` perform the same shutdown from another terminal while preserving tickets, branches, worktrees, tmux panes, and Codex thread IDs.
 
 The full CLI remains available for diagnostics and Donna:
 
