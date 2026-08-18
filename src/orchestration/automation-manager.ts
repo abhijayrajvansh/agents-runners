@@ -117,6 +117,13 @@ export class AutomationManager {
   }
 
   #handleEvent(projectId: string, event: ProjectEvent): void {
+    if (event.type === "project.updated") {
+      const automation = this.#projects.get(projectId);
+      const config = this.registry.get(projectId);
+      for (const role of ["developer", "reviewer", "qa"] as const) {
+        automation?.pools.get(role)?.setMaximum(config.pools[role].max);
+      }
+    }
     if (event.type === "ticket.created" || event.type === "ticket.updated" || event.type === "project.updated") {
       this.reconcile(projectId);
     }

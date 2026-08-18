@@ -4,6 +4,7 @@ import { ZodError } from "zod";
 import type { DonnaService, DonnaMessageSource } from "../donna/donna-service.js";
 import { MCP_TOOL_NAMES, type McpToolName, type McpTools } from "../mcp/tools.js";
 import type { AutomationManager } from "../orchestration/automation-manager.js";
+import { listAvailableCodexModels } from "../runners/codex-models.js";
 import { StoreError } from "../storage/atomic-json-store.js";
 import type { EventBus } from "./event-bus.js";
 import { ProjectRegistryError, type ProjectRegistry } from "./project-registry.js";
@@ -42,6 +43,10 @@ export function createApp(dependencies: AppDependencies): Express {
     response.json({ projects: dependencies.registry.list().map(config => config.project) });
   });
 
+  app.get("/api/models", asyncRoute(async (_request, response) => {
+    response.json({ models: await listAvailableCodexModels() });
+  }));
+
   app.get("/api/search/tickets", (request, response) => {
     const query = typeof request.query.q === "string" ? request.query.q.trim().toLowerCase() : "";
     if (!query) {
@@ -73,6 +78,25 @@ export function createApp(dependencies: AppDependencies): Express {
 
   app.get("/api/projects/:projectId/board", asyncRoute(async (request, response) => {
     response.json(dependencies.registry.getBoard(requiredParam(request.params.projectId)));
+  }));
+
+  app.patch("/api/projects/:projectId/pools/:role", asyncRoute(async (request, response) => {
+    const body = request.body as { maximum?: unknown; expectedRevision?: unknown };
+    response.json(await dependencies.registry.updatePoolMaximum(
+      requiredParam(request.params.projectId),
+      requiredParam(request.params.role),
+      body.maximum,
+      requiredRevision(body.expectedRevision)
+    ));
+  }));
+
+  app.patch("/api/projects/:projectId/donna/model", asyncRoute(async (request, response) => {
+    const body = request.body as { model?: unknown; expectedRevision?: unknown };
+    response.json(await dependencies.registry.updateDonnaModel(
+      requiredParam(request.params.projectId),
+      body.model,
+      requiredRevision(body.expectedRevision)
+    ));
   }));
 
   app.post("/api/projects/:projectId/tickets", asyncRoute(async (request, response) => {

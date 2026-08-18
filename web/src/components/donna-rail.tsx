@@ -3,15 +3,19 @@ import { ArrowUp, PanelLeftClose, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
+import type { CodexModelOption } from "../../../src/runners/codex-models.js";
 
 export type DonnaRailProps = {
   projectName: string;
   messages?: DonnaConversationMessage[];
+  model?: string;
+  models?: CodexModelOption[];
+  onModelChange?(model: string): Promise<void>;
   onSend(message: string): Promise<string>;
   onCollapse(): void;
 };
 
-export function DonnaRail({ projectName, messages = [], onSend, onCollapse }: DonnaRailProps) {
+export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", models = [], onModelChange, onSend, onCollapse }: DonnaRailProps) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [fallbackMessages, setFallbackMessages] = useState<DonnaConversationMessage[]>([]);
@@ -67,7 +71,16 @@ export function DonnaRail({ projectName, messages = [], onSend, onCollapse }: Do
         {sending && <div className="typing-indicator" aria-label="Donna is thinking"><i /><i /><i /></div>}
       </div>
       <form className="donna-composer" onSubmit={event => void submit(event)}>
-        <label htmlFor="donna-message">Message Donna</label>
+        <div className="donna-composer__toolbar">
+          <label htmlFor="donna-message">Message Donna</label>
+          <label className="donna-model">
+            <span>Model</span>
+            <select value={model} onChange={event => void onModelChange?.(event.target.value)} aria-label="Donna model">
+              {!models.some(option => option.id === model) && <option value={model}>{model}</option>}
+              {models.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+            </select>
+          </label>
+        </div>
         <textarea
           id="donna-message"
           value={message}

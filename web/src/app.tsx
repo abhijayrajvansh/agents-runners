@@ -76,7 +76,12 @@ export function App() {
       <TopBar
         projectName={state.project.project.name}
         branch={state.project.project.integrationBranch}
-        runners={state.runners}
+        poolMaximums={{
+          developer: state.project.pools.developer.max,
+          reviewer: state.project.pools.reviewer.max,
+          qa: state.project.pools.qa.max
+        }}
+        onSetPoolMaximum={state.setPoolMaximum}
         onCreate={createTicket}
       />
       {state.error && <div className="error-banner"><AlertCircle size={15} />{state.error}<button type="button" onClick={() => void state.refresh()}>Retry</button></div>}
@@ -113,6 +118,9 @@ export function App() {
           <DonnaRail
             projectName={state.project.project.name}
             messages={state.donnaMessages}
+            model={state.project.donna?.model ?? "gpt-5.6-luna"}
+            models={state.models}
+            onModelChange={state.setDonnaModel}
             onSend={state.messageDonna}
             onCollapse={() => setDonnaOpen(false)}
           />

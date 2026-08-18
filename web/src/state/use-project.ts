@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { ProjectConfig, Ticket, TicketStatus } from "../../../src/domain/types.js";
+import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
 import type { ProjectEvent } from "../../../src/server/event-bus.js";
+import type { CodexModelOption } from "../../../src/runners/codex-models.js";
 import { RunnersApi } from "../api/client.js";
 import { connectProjectSocket } from "../api/socket.js";
 
@@ -14,12 +15,15 @@ export type ProjectState = {
   runners: RunnerRecord[];
   activity: ProjectEvent[];
   donnaMessages: DonnaConversationMessage[];
+  models: CodexModelOption[];
   connected: boolean;
   loading: boolean;
   error: string | null;
   refresh(): Promise<void>;
   moveTicket(ticketId: string, status: TicketStatus, expectedRevision: number): Promise<void>;
   saveTicket(ticket: Partial<Ticket> & { id?: string }): Promise<void>;
+  setPoolMaximum(role: RoleName, maximum: number): Promise<void>;
+  setDonnaModel(model: string): Promise<void>;
   messageDonna(message: string): Promise<string>;
 };
 
@@ -28,6 +32,7 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
   const [runners, setRunners] = useState<RunnerRecord[]>([]);
   const [activity, setActivity] = useState<ProjectEvent[]>([]);
   const [donnaMessages, setDonnaMessages] = useState<DonnaConversationMessage[]>([]);
+  const [models, setModels] = useState<CodexModelOption[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -35,14 +40,16 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextProject, nextRunners, nextDonnaMessages] = await Promise.all([
+      const [nextProject, nextRunners, nextDonnaMessages, nextModels] = await Promise.all([
         api.getProject(projectId),
         api.listRunners(projectId),
-        api.getDonnaMessages(projectId)
+        api.getDonnaMessages(projectId),
+        api.listModels()
       ]);
       setProject(nextProject);
       setRunners(nextRunners);
       setDonnaMessages(nextDonnaMessages);
+      setModels(nextModels);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -94,6 +101,18 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
     await refresh();
   }, [api, project, projectId, refresh]);
 
+  const setPoolMaximum = useCallback(async (role: RoleName, maximum: number) => {
+    if (!project) return;
+    await api.updatePoolMaximum(projectId, role, maximum, project.board.revision);
+    await refresh();
+  }, [api, project, projectId, refresh]);
+
+  const setDonnaModel = useCallback(async (model: string) => {
+    if (!project) return;
+    await api.updateDonnaModel(projectId, model, project.board.revision);
+    await refresh();
+  }, [api, project, projectId, refresh]);
+
   const messageDonna = useCallback(async (message: string) => {
     setDonnaMessages(current => [...current, {
       id: crypto.randomUUID(),
@@ -109,5 +128,5 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
     }
   }, [api, projectId]);
 
-  return { project, runners, activity, donnaMessages, connected, loading, error, refresh, moveTicket, saveTicket, messageDonna };
+  return { project, runners, activity, donnaMessages, models, connected, loading, error, refresh, moveTicket, saveTicket, setPoolMaximum, setDonnaModel, messageDonna };
 }

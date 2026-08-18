@@ -4,8 +4,10 @@ import { z } from "zod";
 
 import {
   ProjectConfigSchema,
+  RoleNameSchema,
   TicketSchema,
   type ProjectConfig,
+  type RoleName,
   type Ticket
 } from "../domain/schema.js";
 import { projectConfigPath } from "../platform/paths.js";
@@ -147,6 +149,60 @@ export class ProjectRegistry {
       payload: { ticket }
     });
     return { revision: next.board.revision, ticket };
+  }
+
+  async updatePoolMaximum(
+    projectId: string,
+    roleInput: unknown,
+    maximumInput: unknown,
+    expectedRevision: number
+  ): Promise<{ revision: number; role: RoleName; maximum: number }> {
+    const project = this.#requireProject(projectId);
+    const role = RoleNameSchema.parse(roleInput);
+    const maximum = z.number().int().min(0).max(20).parse(maximumInput);
+    const now = new Date().toISOString();
+    const next = await project.store.write({
+      ...project.config,
+      metadata: { ...project.config.metadata, updatedAt: now },
+      pools: {
+        ...project.config.pools,
+        [role]: { ...project.config.pools[role], max: maximum }
+      }
+    }, expectedRevision);
+    project.config = next;
+    this.events.publish({
+      type: "project.updated",
+      projectId,
+      revision: next.board.revision,
+      payload: { setting: `pools.${role}.max`, maximum }
+    });
+    return { revision: next.board.revision, role, maximum };
+  }
+
+  async updateDonnaModel(
+    projectId: string,
+    modelInput: unknown,
+    expectedRevision: number
+  ): Promise<{ revision: number; model: string }> {
+    const project = this.#requireProject(projectId);
+    const model = z.string().trim().min(1).max(120).parse(modelInput);
+    const now = new Date().toISOString();
+    const next = await project.store.write({
+      ...project.config,
+      metadata: { ...project.config.metadata, updatedAt: now },
+      donna: {
+        model,
+        reasoningEffort: project.config.donna?.reasoningEffort ?? "low"
+      }
+    }, expectedRevision);
+    project.config = next;
+    this.events.publish({
+      type: "project.updated",
+      projectId,
+      revision: next.board.revision,
+      payload: { setting: "donna.model", model }
+    });
+    return { revision: next.board.revision, model };
   }
 
   close(): void {

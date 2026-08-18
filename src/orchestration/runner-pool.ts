@@ -18,7 +18,7 @@ export type RunnerFactory = (role: RoleName, slot: number) => Promise<RunnerReco
 
 export class RunnerPool {
   readonly role: RoleName;
-  readonly maximum: number;
+  maximum: number;
   readonly factory: RunnerFactory;
   #runners = new Map<string, RunnerRecord>();
 
@@ -26,6 +26,11 @@ export class RunnerPool {
     this.role = role;
     this.maximum = maximum;
     this.factory = factory;
+  }
+
+  setMaximum(maximum: number): void {
+    if (!Number.isInteger(maximum) || maximum < 0 || maximum > 20) throw new Error(`Invalid ${this.role} maximum: ${maximum}`);
+    this.maximum = maximum;
   }
 
   async claim(preferredId?: string): Promise<RunnerRecord | null> {

@@ -40,8 +40,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 @keyframes marquee { to { transform: translateX(-100%); } }
 .top-actions { justify-content: flex-end; gap: 9px; }
 .agent-counts { display: flex; align-items: center; gap: 5px; }
-.agent-counts span { min-height: 30px; display: inline-flex; align-items: center; gap: 4px; padding: 0 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-size: 12px; white-space: nowrap; }
-.agent-counts strong { color: var(--muted); font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.agent-counts .agent-capacity { min-height: 30px; display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-size: 12px; white-space: nowrap; }
+.agent-counts strong { min-width: 12px; color: var(--muted); font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
+.agent-capacity__steps { display: flex; flex-direction: column; gap: 1px; }
+.agent-capacity__steps button { width: 14px; height: 12px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer; }
+.agent-capacity__steps button:hover:not(:disabled) { background: #e6e6e0; color: var(--ink); }.agent-capacity__steps button:disabled { opacity: .25; }
 .global-search { position: relative; height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 9px; background: white; color: var(--muted); }
 .global-search:focus-within { border-color: #9d9d95; box-shadow: 0 0 0 3px rgba(20,20,18,.04); }
 .global-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 11px; }
@@ -110,12 +113,12 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .ticket-next:hover { background: #efefeb; color: var(--ink); }
 
 .donna-rail { min-width: 0; grid-column: 1; grid-row: 1; max-height: calc(100vh - 54px); position: sticky; top: 54px; display: grid; grid-template-rows: auto minmax(210px, 1fr) auto; border-right: 1px solid var(--line); background: white; }
-.donna-header { height: 72px; display: flex; align-items: center; gap: 11px; padding: 0 22px; border-bottom: 1px solid var(--line); }
-.donna-mark { display: grid; place-items: center; width: 33px; height: 33px; border-radius: 10px; background: var(--ink); color: white; }
+.donna-header { height: 52px; display: flex; align-items: center; gap: 9px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.donna-mark { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 9px; background: var(--ink); color: white; }
 .donna-header > div:nth-child(2) { display: flex; flex-direction: column; }
 .donna-header strong { font-size: 13px; font-weight: 500; }.donna-header span { color: var(--muted); font-size: 10px; }
 .donna-header .presence-dot { margin-left: auto; background: var(--success); }.donna-header .presence-dot--busy { background: var(--warning); }
-.donna-collapse { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--muted); cursor: pointer; }
+.donna-collapse { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--muted); cursor: pointer; }
 .donna-collapse:hover { border-color: var(--line-strong); background: var(--soft); color: var(--ink); }
 .donna-reopen { position: fixed; top: 70px; left: 16px; z-index: 35; min-height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(255,255,255,.96); box-shadow: 0 8px 26px rgba(25,25,20,.08); color: var(--muted); font-size: 11px; cursor: pointer; backdrop-filter: blur(12px); }
 .donna-reopen:hover { background: var(--soft); color: var(--ink); }.donna-reopen kbd { margin-left: 2px; }
@@ -132,7 +135,11 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .typing-indicator { display: flex; gap: 3px; }.typing-indicator i { width: 4px; height: 4px; border-radius: 50%; background: #999; animation: pulse 1s ease-in-out infinite; }.typing-indicator i:nth-child(2) { animation-delay: .12s; }.typing-indicator i:nth-child(3) { animation-delay: .24s; }
 @keyframes pulse { 50% { opacity: .3; transform: translateY(-2px); } }
 .donna-composer { position: relative; margin: 0 18px 18px; padding: 10px 44px 10px 12px; border: 1px solid var(--line-strong); border-radius: 12px; background: white; box-shadow: 0 8px 26px rgba(25,25,20,.06); }
-.donna-composer label { display: block; color: var(--faint); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }.donna-composer textarea { width: 100%; resize: none; margin-top: 4px; padding: 0; border: 0; outline: 0; color: var(--ink); font-size: 12px; line-height: 1.4; }.donna-composer textarea::placeholder { color: #b1b1ab; }.donna-composer button { position: absolute; right: 9px; bottom: 9px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 8px; background: var(--ink); color: white; cursor: pointer; }
+.donna-composer__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.donna-composer label { color: var(--faint); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.donna-model { display: flex; align-items: center; gap: 5px; }
+.donna-model select { max-width: 145px; padding: 3px 20px 3px 6px; border: 1px solid var(--line); border-radius: 6px; outline: 0; background: var(--soft); color: var(--muted); font-size: 9px; letter-spacing: 0; text-transform: none; cursor: pointer; }
+.donna-composer textarea { width: 100%; resize: none; margin-top: 4px; padding: 0; border: 0; outline: 0; color: var(--ink); font-size: 12px; line-height: 1.4; }.donna-composer textarea::placeholder { color: #b1b1ab; }.donna-composer button { position: absolute; right: 9px; bottom: 9px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 8px; background: var(--ink); color: white; cursor: pointer; }
 
 .runner-inspector { padding: 30px 28px 44px; }
 .runner-inspector > header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }.runner-inspector h2 { font-size: 20px; }.runner-inspector > header > span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }

@@ -1,6 +1,7 @@
-import type { ProjectConfig, Ticket, TicketStatus } from "../../../src/domain/types.js";
+import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
+import type { CodexModelOption } from "../../../src/runners/codex-models.js";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -13,6 +14,11 @@ export class ApiError extends Error {
 }
 
 export class RunnersApi {
+  async listModels(): Promise<CodexModelOption[]> {
+    const response = await this.#request<{ models: CodexModelOption[] }>("/api/models");
+    return response.models;
+  }
+
   async searchTickets(query: string): Promise<Array<{ projectId: string; projectName: string; ticket: Ticket }>> {
     const response = await this.#request<{ results: Array<{ projectId: string; projectName: string; ticket: Ticket }> }>(
       `/api/search/tickets?q=${encodeURIComponent(query)}`
@@ -31,6 +37,20 @@ export class RunnersApi {
 
   async moveTicket(projectId: string, ticketId: string, status: TicketStatus, expectedRevision: number) {
     return this.updateTicket(projectId, ticketId, { status }, expectedRevision);
+  }
+
+  async updatePoolMaximum(projectId: string, role: RoleName, maximum: number, expectedRevision: number) {
+    return this.#request<{ revision: number; role: RoleName; maximum: number }>(
+      `/api/projects/${encodeURIComponent(projectId)}/pools/${encodeURIComponent(role)}`,
+      { method: "PATCH", body: JSON.stringify({ maximum, expectedRevision }) }
+    );
+  }
+
+  async updateDonnaModel(projectId: string, model: string, expectedRevision: number) {
+    return this.#request<{ revision: number; model: string }>(
+      `/api/projects/${encodeURIComponent(projectId)}/donna/model`,
+      { method: "PATCH", body: JSON.stringify({ model, expectedRevision }) }
+    );
   }
 
   async updateTicket(projectId: string, ticketId: string, patch: Partial<Ticket>, expectedRevision: number) {
