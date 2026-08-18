@@ -1,5 +1,4 @@
 import express, { type ErrorRequestHandler, type Express } from "express";
-import path from "node:path";
 import { ZodError } from "zod";
 
 import type { DonnaService, DonnaMessageSource } from "../donna/donna-service.js";
@@ -116,7 +115,7 @@ export function createApp(dependencies: AppDependencies): Express {
   if (dependencies.publicDirectory) {
     app.use(express.static(dependencies.publicDirectory));
     app.get("/{*splat}", (_request, response) => {
-      response.sendFile(path.join(dependencies.publicDirectory as string, "index.html"));
+      response.sendFile("index.html", { root: dependencies.publicDirectory });
     });
   }
 
