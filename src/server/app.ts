@@ -42,6 +42,30 @@ export function createApp(dependencies: AppDependencies): Express {
     response.json({ projects: dependencies.registry.list().map(config => config.project) });
   });
 
+  app.get("/api/search/tickets", (request, response) => {
+    const query = typeof request.query.q === "string" ? request.query.q.trim().toLowerCase() : "";
+    if (!query) {
+      response.json({ results: [] });
+      return;
+    }
+    const results = dependencies.registry.list().flatMap(config => config.board.tickets
+      .filter(ticket => [
+        ticket.id,
+        ticket.title,
+        ticket.description,
+        ticket.status,
+        ticket.type,
+        ...ticket.acceptanceCriteria
+      ].some(value => value.toLowerCase().includes(query)) || config.project.name.toLowerCase().includes(query))
+      .map(ticket => ({
+        projectId: config.project.id,
+        projectName: config.project.name,
+        ticket
+      })))
+      .slice(0, 50);
+    response.json({ results });
+  });
+
   app.get("/api/projects/:projectId", asyncRoute(async (request, response) => {
     const config = dependencies.registry.get(requiredParam(request.params.projectId));
     response.json(config);

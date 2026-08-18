@@ -13,6 +13,7 @@ import { useProject } from "./state/use-project.js";
 
 export function App() {
   const projectId = projectIdFromLocation();
+  const requestedTicketId = new URLSearchParams(window.location.search).get("ticket");
   const state = useProject(projectId);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
@@ -23,6 +24,12 @@ export function App() {
   const selectedTicket = useMemo<Ticket | null>(() => (
     state.project?.board.tickets.find(ticket => ticket.id === selectedTicketId) ?? null
   ), [selectedTicketId, state.project]);
+
+  useEffect(() => {
+    if (!requestedTicketId || !state.project?.board.tickets.some(ticket => ticket.id === requestedTicketId)) return;
+    setSelectedTicketId(requestedTicketId);
+    setDrawerOpen(true);
+  }, [requestedTicketId, state.project?.project.id]);
 
   useEffect(() => {
     const listener = (event: KeyboardEvent) => {

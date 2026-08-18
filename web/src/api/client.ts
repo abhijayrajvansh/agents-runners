@@ -13,6 +13,13 @@ export class ApiError extends Error {
 }
 
 export class RunnersApi {
+  async searchTickets(query: string): Promise<Array<{ projectId: string; projectName: string; ticket: Ticket }>> {
+    const response = await this.#request<{ results: Array<{ projectId: string; projectName: string; ticket: Ticket }> }>(
+      `/api/search/tickets?q=${encodeURIComponent(query)}`
+    );
+    return response.results;
+  }
+
   async getProject(projectId: string): Promise<ProjectConfig> {
     return this.#request(`/api/projects/${encodeURIComponent(projectId)}`);
   }
