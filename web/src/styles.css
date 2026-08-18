@@ -43,8 +43,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .agent-counts .agent-capacity { min-height: 30px; display: inline-flex; align-items: center; gap: 4px; padding: 0 4px 0 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--soft); font-size: 12px; white-space: nowrap; }
 .agent-counts strong { min-width: 12px; color: var(--muted); font-size: 10px; font-weight: 600; font-variant-numeric: tabular-nums; text-align: center; }
 .agent-capacity__steps { display: flex; flex-direction: column; gap: 1px; }
-.agent-capacity__steps button { width: 14px; height: 12px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer; }
-.agent-capacity__steps button:hover:not(:disabled) { background: #e6e6e0; color: var(--ink); }.agent-capacity__steps button:disabled { opacity: .25; }
+.top-actions .agent-capacity__steps button { width: 14px; min-height: 0; height: 12px; display: grid; place-items: center; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--muted); cursor: pointer; }
+.top-actions .agent-capacity__steps button:hover:not(:disabled) { background: #e6e6e0; color: var(--ink); }.top-actions .agent-capacity__steps button:disabled { opacity: .25; }
 .global-search { position: relative; height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid var(--line-strong); border-radius: 9px; background: white; color: var(--muted); }
 .global-search:focus-within { border-color: #9d9d95; box-shadow: 0 0 0 3px rgba(20,20,18,.04); }
 .global-search input { width: 100%; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font-size: 11px; }

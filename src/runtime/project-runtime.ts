@@ -26,6 +26,8 @@ export interface ProjectRuntimeRepository {
   setDonnaThread(projectId: string, threadId: string): void;
   getDonnaMessages(projectId: string): DonnaConversationMessage[];
   appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">): DonnaConversationMessage;
+  getBlockerNotification(projectId: string, ticketId: string): string | undefined;
+  setBlockerNotification(projectId: string, ticketId: string, ticketUpdatedAt: string): void;
   getRunnerThread(projectId: string, runnerId: string): string | undefined;
   setRunnerThread(projectId: string, runnerId: string, threadId: string): void;
 }
@@ -34,6 +36,7 @@ export class MemoryProjectRuntime implements ProjectRuntimeRepository {
   #tickets = new Map<string, TicketRuntimeState>();
   #donnaThreads = new Map<string, string>();
   #donnaMessages = new Map<string, DonnaConversationMessage[]>();
+  #blockerNotifications = new Map<string, string>();
   #runnerThreads = new Map<string, string>();
 
   getTicket(projectId: string, ticketId: string): TicketRuntimeState {
@@ -62,6 +65,14 @@ export class MemoryProjectRuntime implements ProjectRuntimeRepository {
     return structuredClone(stored);
   }
 
+  getBlockerNotification(projectId: string, ticketId: string): string | undefined {
+    return this.#blockerNotifications.get(key(projectId, ticketId));
+  }
+
+  setBlockerNotification(projectId: string, ticketId: string, ticketUpdatedAt: string): void {
+    this.#blockerNotifications.set(key(projectId, ticketId), ticketUpdatedAt);
+  }
+
   getRunnerThread(projectId: string, runnerId: string): string | undefined {
     return this.#runnerThreads.get(key(projectId, runnerId));
   }
@@ -76,6 +87,7 @@ type RuntimeDocument = {
   tickets: Record<string, TicketRuntimeState>;
   donnaThreads: Record<string, string>;
   donnaMessages: Record<string, DonnaConversationMessage[]>;
+  blockerNotifications: Record<string, string>;
   runnerThreads: Record<string, string>;
 };
 
@@ -117,6 +129,15 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
     return structuredClone(stored);
   }
 
+  getBlockerNotification(projectId: string, ticketId: string): string | undefined {
+    return this.#document.blockerNotifications[key(projectId, ticketId)];
+  }
+
+  setBlockerNotification(projectId: string, ticketId: string, ticketUpdatedAt: string): void {
+    this.#document.blockerNotifications[key(projectId, ticketId)] = ticketUpdatedAt;
+    this.#persist();
+  }
+
   getRunnerThread(projectId: string, runnerId: string): string | undefined {
     return this.#document.runnerThreads[key(projectId, runnerId)];
   }
@@ -134,7 +155,7 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
   }
 
   #load(): RuntimeDocument {
-    if (!existsSync(this.filePath)) return { version: 1, tickets: {}, donnaThreads: {}, donnaMessages: {}, runnerThreads: {} };
+    if (!existsSync(this.filePath)) return { version: 1, tickets: {}, donnaThreads: {}, donnaMessages: {}, blockerNotifications: {}, runnerThreads: {} };
     const parsed = JSON.parse(readFileSync(this.filePath, "utf8")) as Partial<RuntimeDocument>;
     if (parsed.version !== 1 || !parsed.tickets || typeof parsed.tickets !== "object") {
       throw new Error(`Invalid Codex Runners runtime document at ${this.filePath}`);
@@ -144,6 +165,7 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
       tickets: parsed.tickets,
       donnaThreads: parsed.donnaThreads ?? {},
       donnaMessages: parsed.donnaMessages ?? loadLegacyDonnaMessages(path.dirname(this.filePath)),
+      blockerNotifications: parsed.blockerNotifications ?? {},
       runnerThreads: parsed.runnerThreads ?? {}
     };
   }

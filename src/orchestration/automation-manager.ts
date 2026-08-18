@@ -1,4 +1,4 @@
-import type { ProjectConfig, RoleName } from "../domain/types.js";
+import type { ProjectConfig, RoleName, Ticket } from "../domain/types.js";
 import { IntegrationService } from "../git/integration-service.js";
 import { projectRuntimePath } from "../platform/paths.js";
 import { CommandRunner } from "../process/command-runner.js";
@@ -78,6 +78,9 @@ export class AutomationManager {
     const scheduler = new Scheduler({ registry: this.registry, events: this.events, runtime, pools, executor });
     const unsubscribe = this.events.subscribe(projectId, event => this.#handleEvent(projectId, event));
     this.#projects.set(projectId, { runtime, pools, scheduler, unsubscribe });
+    for (const ticket of config.board.tickets.filter(candidate => candidate.status === "blocked")) {
+      this.#notifyBlocker(projectId, ticket);
+    }
     this.reconcile(projectId);
   }
 
@@ -124,9 +127,36 @@ export class AutomationManager {
         automation?.pools.get(role)?.setMaximum(config.pools[role].max);
       }
     }
+    if (event.type === "ticket.updated") {
+      const ticketId = typeof (event.payload.ticket as { id?: unknown } | undefined)?.id === "string"
+        ? (event.payload.ticket as { id: string }).id
+        : undefined;
+      const ticket = ticketId
+        ? this.registry.getBoard(projectId).tickets.find(candidate => candidate.id === ticketId)
+        : undefined;
+      if (ticket?.status === "blocked") this.#notifyBlocker(projectId, ticket);
+    }
     if (event.type === "ticket.created" || event.type === "ticket.updated" || event.type === "project.updated") {
       this.reconcile(projectId);
     }
+  }
+
+  #notifyBlocker(projectId: string, ticket: Ticket): void {
+    const automation = this.#projects.get(projectId);
+    if (!automation || automation.runtime.getBlockerNotification(projectId, ticket.id) === ticket.updatedAt) return;
+    const runtime = automation.runtime.getTicket(projectId, ticket.id);
+    const message = automation.runtime.appendDonnaMessage(projectId, {
+      author: "donna",
+      text: buildBlockerMessage(this.registry.get(projectId), ticket, runtime.findings),
+      source: "mcp"
+    });
+    automation.runtime.setBlockerNotification(projectId, ticket.id, ticket.updatedAt);
+    this.events.publish({
+      type: "donna.blocker",
+      projectId,
+      revision: this.registry.getBoard(projectId).revision,
+      payload: { message, ticketId: ticket.id }
+    });
   }
 }
 
@@ -166,4 +196,30 @@ function assignedRunnerId(input: StageExecution): string | undefined {
 
 function sessionName(projectId: string): string {
   return `codex-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+function buildBlockerMessage(project: ProjectConfig, ticket: Ticket, findings: string[]): string {
+  const unfinishedDependencies = ticket.dependencies
+    .map(id => project.board.tickets.find(candidate => candidate.id === id))
+    .filter(dependency => dependency?.status !== "done");
+  const missingContext = !ticket.description.trim() || ticket.acceptanceCriteria.length === 0;
+  const reason = findings.find(finding => finding.trim())
+    ?? ticket.comments.at(-1)?.body
+    ?? "No technical blocker was recorded by the runner.";
+  const recommendation = unfinishedDependencies.length > 0
+    ? `Complete the dependency ${unfinishedDependencies.map(dependency => `\`${dependency?.title ?? "unknown"}\``).join(", ")} first, then move this ticket to **Todo**.`
+    : missingContext
+      ? "Restore the missing description and acceptance criteria, then move the ticket to **Todo** for a clean retry."
+      : "Review the runner finding, apply the suggested correction, then move the ticket to **Todo** to retry with the same persistent agent context.";
+
+  return [
+    "## Blocker needs your decision",
+    `**Ticket:** ${ticket.title} (\`${ticket.id}\`)`,
+    `**What happened:** ${reason}`,
+    "### Available paths",
+    `1. **Recommended:** ${recommendation}`,
+    "2. **Retry now:** Move the ticket to **Todo** immediately and let the assigned developer try again.",
+    "3. **Replan:** Keep it blocked, edit the ticket details, or split the problem into a smaller recovery ticket.",
+    "Reply with **1**, **2**, or **3** (and any constraints). I’ll continue from your choice immediately."
+  ].join("\n\n");
 }
