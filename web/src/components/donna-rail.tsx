@@ -92,9 +92,7 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
       </div>
       <form className="donna-composer" onSubmit={event => void submit(event)}>
         <div className="donna-composer__toolbar">
-          <label htmlFor="donna-message">Message Donna</label>
           <div className="donna-model" ref={modelPickerElement}>
-            <span>Model</span>
             <button type="button" className="donna-model__trigger" aria-haspopup="listbox" aria-expanded={modelOpen} onClick={() => setModelOpen(open => !open)}>
               {models.find(option => option.id === model)?.label ?? model}<ChevronDown size={11} />
             </button>
@@ -115,6 +113,7 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
         </div>
         <textarea
           id="donna-message"
+          aria-label="Message Donna"
           value={message}
           onChange={event => setMessage(event.target.value)}
           onKeyDown={event => {
