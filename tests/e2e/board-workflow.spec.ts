@@ -6,6 +6,12 @@ test("creates, starts, and autonomously completes a ticket with Donna available"
   expect(projectId).toBeTruthy();
   await page.goto(`/projects/${projectId}`);
 
+  await page.keyboard.press("Meta+b");
+  await expect(page.getByRole("button", { name: "Expand Donna (⌘B)" })).toBeVisible();
+  await expect(page.getByLabel("Donna project manager")).toBeHidden();
+  await page.keyboard.press("Meta+b");
+  await expect(page.getByLabel("Donna project manager")).toBeVisible();
+
   await page.getByRole("button", { name: "Create ticket" }).click();
   const drawer = page.getByRole("dialog", { name: "Create ticket" });
   await drawer.getByLabel("Title").fill("Ship account recovery");

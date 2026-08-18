@@ -54,6 +54,7 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .error-banner button { margin-left: auto; border: 0; background: none; text-decoration: underline; cursor: pointer; }
 
 .workspace { display: grid; grid-template-columns: minmax(0, 8fr) minmax(320px, 4fr); min-height: calc(100vh - 68px); border-bottom: 1px solid var(--line); }
+.workspace[data-donna-collapsed] { grid-template-columns: minmax(0, 1fr); }
 .board-pane { min-width: 0; padding: 32px 0 38px 28px; overflow: hidden; }
 .workspace-heading { display: flex; align-items: flex-end; justify-content: space-between; padding: 0 28px 25px 0; }
 .eyebrow { display: block; margin-bottom: 6px; color: var(--muted); font-size: 9px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; }
@@ -95,6 +96,10 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .donna-header > div:nth-child(2) { display: flex; flex-direction: column; }
 .donna-header strong { font-size: 13px; font-weight: 500; }.donna-header span { color: var(--muted); font-size: 10px; }
 .donna-header .presence-dot { margin-left: auto; background: var(--success); }.donna-header .presence-dot--busy { background: var(--warning); }
+.donna-collapse { display: grid; place-items: center; width: 30px; height: 30px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: white; color: var(--muted); cursor: pointer; }
+.donna-collapse:hover { border-color: var(--line-strong); background: var(--soft); color: var(--ink); }
+.donna-reopen { position: fixed; top: 86px; right: 16px; z-index: 35; min-height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(255,255,255,.96); box-shadow: 0 8px 26px rgba(25,25,20,.08); color: var(--muted); font-size: 11px; cursor: pointer; backdrop-filter: blur(12px); }
+.donna-reopen:hover { background: var(--soft); color: var(--ink); }.donna-reopen kbd { margin-left: 2px; }
 .donna-context { margin: 16px 18px 0; padding: 13px; border-radius: 9px; background: var(--soft); }
 .donna-context span { font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }.donna-context p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
 .donna-messages { overflow-y: auto; display: flex; flex-direction: column; gap: 17px; padding: 22px; }
@@ -121,10 +126,10 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 @keyframes breathe { 50% { opacity: .48; transform: scale(.97); } }
 
 @media (max-width: 1100px) {
-  .top-bar { grid-template-columns: 1fr auto; }.top-activity { display: none; }.workspace { grid-template-columns: minmax(0, 1fr) 330px; }.command-button { display: none !important; }
+  .top-bar { grid-template-columns: 1fr auto; }.top-activity { display: none; }.workspace:not([data-donna-collapsed]) { grid-template-columns: minmax(0, 1fr) 330px; }.command-button { display: none !important; }
 }
 @media (max-width: 820px) {
-  .top-bar { height: auto; min-height: 62px; padding: 10px 16px; }.runner-faces { display: none; }.top-actions .primary-button { padding: 0 10px; }.workspace { display: block; }.board-pane { padding: 24px 0 26px 16px; }.workspace-heading { padding-right: 16px; }.board-summary { gap: 10px; }.board-scroll { padding-right: 16px; }.donna-rail { position: relative; top: auto; max-height: none; min-height: 620px; border-top: 1px solid var(--line); border-left: 0; }.runner-inspector { padding: 26px 16px; }.runner-groups { grid-template-columns: 1fr; }
+  .top-bar { height: auto; min-height: 62px; padding: 10px 16px; }.runner-faces { display: none; }.top-actions .primary-button { padding: 0 10px; }.workspace { display: block; }.board-pane { padding: 24px 0 26px 16px; }.workspace-heading { padding-right: 16px; }.board-summary { gap: 10px; }.board-scroll { padding-right: 16px; }.donna-rail { position: relative; top: auto; max-height: none; min-height: 620px; border-top: 1px solid var(--line); border-left: 0; }.donna-reopen { top: 74px; right: 10px; }.runner-inspector { padding: 26px 16px; }.runner-groups { grid-template-columns: 1fr; }
 }
 @media (max-width: 520px) {
   .brand-lockup span { display: none; }.top-actions .primary-button { font-size: 0; }.top-actions .primary-button svg { margin: 0; }.workspace-heading { align-items: flex-start; flex-direction: column; gap: 16px; }.form-row { grid-template-columns: 1fr; }.ticket-drawer { padding: 18px; }

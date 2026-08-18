@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, PanelRightOpen, RefreshCw } from "lucide-react";
 
 import type { Ticket } from "../../src/domain/types.js";
 import { Board } from "./components/board.js";
@@ -17,6 +17,7 @@ export function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [donnaOpen, setDonnaOpen] = useState(true);
   const shell = useRef<HTMLDivElement>(null);
   const selectedTicket = useMemo<Ticket | null>(() => (
     state.project?.board.tickets.find(ticket => ticket.id === selectedTicketId) ?? null
@@ -27,6 +28,10 @@ export function App() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setPaletteOpen(current => !current);
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "b") {
+        event.preventDefault();
+        setDonnaOpen(current => !current);
       }
       if (event.key === "Escape") {
         setPaletteOpen(false);
@@ -71,7 +76,7 @@ export function App() {
         onCommand={() => setPaletteOpen(true)}
       />
       {state.error && <div className="error-banner"><AlertCircle size={15} />{state.error}<button type="button" onClick={() => void state.refresh()}>Retry</button></div>}
-      <main className="workspace">
+      <main className="workspace" data-donna-collapsed={!donnaOpen || undefined}>
         <section className="board-pane">
           <div className="workspace-heading">
             <div><span className="eyebrow">Autonomous delivery</span><h1>{state.project.project.name}</h1></div>
@@ -88,8 +93,19 @@ export function App() {
             onOpenTicket={openTicket}
           />
         </section>
-        <DonnaRail projectName={state.project.project.name} onSend={state.messageDonna} />
+        {donnaOpen && (
+          <DonnaRail
+            projectName={state.project.project.name}
+            onSend={state.messageDonna}
+            onCollapse={() => setDonnaOpen(false)}
+          />
+        )}
       </main>
+      {!donnaOpen && (
+        <button type="button" className="donna-reopen" aria-label="Expand Donna (⌘B)" onClick={() => setDonnaOpen(true)}>
+          <PanelRightOpen size={16} /><span>Donna</span><kbd>⌘B</kbd>
+        </button>
+      )}
       <RunnerInspector runners={state.runners} />
       <TicketDrawer
         open={drawerOpen}
@@ -102,7 +118,10 @@ export function App() {
         open={paletteOpen}
         onClose={() => setPaletteOpen(false)}
         onCreate={createTicket}
-        onOpenDonna={() => document.querySelector<HTMLTextAreaElement>("#donna-message")?.focus()}
+        onOpenDonna={() => {
+          setDonnaOpen(true);
+          requestAnimationFrame(() => document.querySelector<HTMLTextAreaElement>("#donna-message")?.focus());
+        }}
       />
     </div>
   );

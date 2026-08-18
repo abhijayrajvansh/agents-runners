@@ -1,14 +1,15 @@
 import { FormEvent, useState } from "react";
-import { ArrowUp, Sparkles } from "lucide-react";
+import { ArrowUp, PanelRightClose, Sparkles } from "lucide-react";
 
 type Message = { id: string; author: "user" | "donna"; text: string };
 
 export type DonnaRailProps = {
   projectName: string;
   onSend(message: string): Promise<string>;
+  onCollapse(): void;
 };
 
-export function DonnaRail({ projectName, onSend }: DonnaRailProps) {
+export function DonnaRail({ projectName, onSend, onCollapse }: DonnaRailProps) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [messages, setMessages] = useState<Message[]>([{
@@ -44,6 +45,9 @@ export function DonnaRail({ projectName, onSend }: DonnaRailProps) {
         <div className="donna-mark"><Sparkles size={15} /></div>
         <div><strong>Donna</strong><span>{sending ? "Thinking" : "Available"}</span></div>
         <span className={`presence-dot ${sending ? "presence-dot--busy" : ""}`} />
+        <button type="button" className="donna-collapse" aria-label="Collapse Donna (⌘B)" onClick={onCollapse} title="Collapse Donna (⌘B)">
+          <PanelRightClose size={15} />
+        </button>
       </header>
       <div className="donna-context">
         <span>Project manager</span>
