@@ -158,6 +158,19 @@ export async function printProjectSessions(runtimeRoot: string): Promise<void> {
   }
 }
 
+export async function waitForProjectSessionEnd(projectRoot: string, timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const session = await readProjectSession(projectRoot);
+    if (!session || !isProcessAlive(session.pid)) return;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  const session = await readProjectSession(projectRoot);
+  throw new ProjectSessionError(
+    `Timed out waiting for ${session?.projectId ?? "the project"} session${session ? ` (PID ${session.pid})` : ""} to stop`
+  );
+}
+
 async function readTmuxSession(projectId: string): Promise<{
   name: string;
   panes: Array<{ window: string; command: string; pid: string; path: string }>;

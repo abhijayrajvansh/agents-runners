@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const entryPath = fileURLToPath(import.meta.url);
 const shortcut = path.basename(entryPath, path.extname(entryPath));
-const command = shortcut === "start" ? "start" : "stop";
+const command = shortcut === "start" || shortcut === "restart" ? shortcut : "stop";
 const cliPath = path.join(path.dirname(entryPath), "cli.mjs");
 const child = spawn(process.execPath, [cliPath, command, ...process.argv.slice(2)], {
   stdio: "inherit"

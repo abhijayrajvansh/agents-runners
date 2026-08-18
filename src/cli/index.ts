@@ -13,7 +13,7 @@ import { Command } from "commander";
 import { ProjectConfigSchema } from "../domain/schema.js";
 import { runDonnaClient } from "./donna-client.js";
 import { readDaemonStatus, stopDaemon } from "./daemon-client.js";
-import { printProjectSessions, ProjectSessionError, runProjectSession } from "./project-session.js";
+import { printProjectSessions, ProjectSessionError, waitForProjectSessionEnd } from "./project-session.js";
 import { runDoctor } from "../doctor/doctor.js";
 import { handleSessionStart } from "../hooks/session-start.js";
 import { initializeProject } from "../init/initialize-project.js";
@@ -97,23 +97,32 @@ export function createCli(): Command {
     });
 
   program.command("start")
-    .description("Start one foreground project session and stream live activity")
+    .description("Start the current project in the background and open its board")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
       const config = await loadProjectConfig(options.root);
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
-      await runProjectSession(
-        config,
-        result.url,
-        userRuntimeRoot(),
-        config.server.openBrowser ? async () => { await exec("open", [result.url]); } : undefined
-      );
+      if (config.server.openBrowser) await exec("open", [result.url]);
+      process.stdout.write(`Codex Runners started in the background.\n${result.url}\n`);
     });
 
   program.command("stop")
     .description("Stop the shared daemon without removing persistent runner state")
     .action(async () => {
       process.stdout.write(`${JSON.stringify(await stopDaemon(userRuntimeRoot()), null, 2)}\n`);
+    });
+
+  program.command("restart")
+    .description("Restart the current project in the background and reopen its board")
+    .option("--root <path>", "initialized project root", process.cwd())
+    .action(async options => {
+      const config = await loadProjectConfig(options.root);
+      process.stdout.write(`Restarting Codex Runners · ${config.project.name}…\n`);
+      await stopDaemon(userRuntimeRoot());
+      await waitForProjectSessionEnd(config.project.repositoryRoot);
+      const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
+      if (config.server.openBrowser) await exec("open", [result.url]);
+      process.stdout.write(`Codex Runners restarted in the background.\n${result.url}\n`);
     });
 
   program.command("status")

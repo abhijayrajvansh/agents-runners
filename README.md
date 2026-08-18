@@ -52,9 +52,10 @@ codex-runners-stop
 # Equivalent full CLI commands
 codex-runners start
 codex-runners stop
+codex-runners restart
 ```
 
-Run either command style from an initialized project repository. `codex-runners-start` and `codex-runners start` open the board and stay attached as a live activity log. A project can have only one attached session. Pressing `Ctrl+C` stops the shared daemon and exits cleanly. `codex-runners-stop` and `codex-runners stop` perform the same shutdown from another terminal while preserving tickets, branches, worktrees, tmux panes, and Codex thread IDs.
+Run either start/stop command style from an initialized project repository. `codex-runners-start` and `codex-runners start` start or reuse the shared daemon, register the current project, open its board, and immediately return to the shell while work continues in the background. Repeated starts reuse the same daemon and project. `codex-runners-stop` and `codex-runners stop` shut down the background daemon. `codex-runners restart` stops the current daemon, clears any legacy foreground session, then reopens the same project in the background. All lifecycle commands preserve tickets, branches, worktrees, tmux panes, and Codex thread IDs.
 
 The full CLI remains available for diagnostics and Donna:
 
