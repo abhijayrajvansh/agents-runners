@@ -137,9 +137,15 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .donna-composer { position: relative; margin: 0 18px 18px; padding: 10px 44px 10px 12px; border: 1px solid var(--line-strong); border-radius: 12px; background: white; box-shadow: 0 8px 26px rgba(25,25,20,.06); }
 .donna-composer__toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .donna-composer label { color: var(--faint); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
-.donna-model { display: flex; align-items: center; gap: 5px; }
-.donna-model select { max-width: 145px; padding: 3px 20px 3px 6px; border: 1px solid var(--line); border-radius: 6px; outline: 0; background: var(--soft); color: var(--muted); font-size: 9px; letter-spacing: 0; text-transform: none; cursor: pointer; }
-.donna-composer textarea { width: 100%; resize: none; margin-top: 4px; padding: 0; border: 0; outline: 0; color: var(--ink); font-size: 12px; line-height: 1.4; }.donna-composer textarea::placeholder { color: #b1b1ab; }.donna-composer button { position: absolute; right: 9px; bottom: 9px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 8px; background: var(--ink); color: white; cursor: pointer; }
+.donna-model { position: relative; display: flex; align-items: center; gap: 5px; color: var(--faint); font-size: 9px; text-transform: uppercase; letter-spacing: .08em; }
+.donna-model__trigger { max-width: 155px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; padding: 3px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--soft); color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.donna-model__trigger svg { flex: 0 0 auto; }
+.donna-model__menu { width: 280px; max-height: min(390px, 55vh); position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 70; overflow-y: auto; padding: 6px; border: 1px solid var(--line-strong); border-radius: 11px; background: white; box-shadow: 0 18px 50px rgba(20,20,16,.14); text-align: left; text-transform: none; letter-spacing: 0; }
+.donna-model__group + .donna-model__group { margin-top: 5px; padding-top: 5px; border-top: 1px solid var(--line); }
+.donna-model__group > span { display: block; padding: 5px 8px 4px; color: var(--faint); font-size: 9px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+.donna-model__menu button { width: 100%; min-height: 32px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px; border: 0; border-radius: 7px; background: white; color: var(--muted); font-size: 11px; text-align: left; cursor: pointer; }
+.donna-model__menu button:hover, .donna-model__menu button[aria-selected="true"] { background: var(--soft); color: var(--ink); }
+.donna-composer textarea { width: 100%; resize: none; margin-top: 4px; padding: 0; border: 0; outline: 0; color: var(--ink); font-size: 12px; line-height: 1.4; }.donna-composer textarea::placeholder { color: #b1b1ab; }.donna-composer > button[type="submit"] { position: absolute; right: 9px; bottom: 9px; display: grid; place-items: center; width: 29px; height: 29px; padding: 0; border: 0; border-radius: 8px; background: var(--ink); color: white; cursor: pointer; }
 
 .runner-inspector { padding: 30px 28px 44px; }
 .runner-inspector > header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 20px; }.runner-inspector h2 { font-size: 20px; }.runner-inspector > header > span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }

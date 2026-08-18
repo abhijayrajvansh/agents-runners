@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { ArrowUp, PanelLeftClose, Sparkles } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, PanelLeftClose, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
@@ -18,9 +18,11 @@ export type DonnaRailProps = {
 export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", models = [], onModelChange, onSend, onCollapse }: DonnaRailProps) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [modelOpen, setModelOpen] = useState(false);
   const [fallbackMessages, setFallbackMessages] = useState<DonnaConversationMessage[]>([]);
   const visibleMessages = messages.length > 0 ? messages : fallbackMessages;
   const messagesElement = useRef<HTMLDivElement>(null);
+  const modelPickerElement = useRef<HTMLDivElement>(null);
   const nativeModels = models.filter(option => option.source === "Codex");
   const routerModels = models.filter(option => option.source === "Codex Router");
 
@@ -29,6 +31,22 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
     if (!element) return;
     element.scrollTop = element.scrollHeight;
   }, [visibleMessages.length, sending]);
+
+  useEffect(() => {
+    if (!modelOpen) return;
+    const closeOnPointerDown = (event: PointerEvent) => {
+      if (!modelPickerElement.current?.contains(event.target as Node)) setModelOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setModelOpen(false);
+    };
+    window.addEventListener("pointerdown", closeOnPointerDown);
+    window.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("pointerdown", closeOnPointerDown);
+      window.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [modelOpen]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -75,18 +93,25 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
       <form className="donna-composer" onSubmit={event => void submit(event)}>
         <div className="donna-composer__toolbar">
           <label htmlFor="donna-message">Message Donna</label>
-          <label className="donna-model">
+          <div className="donna-model" ref={modelPickerElement}>
             <span>Model</span>
-            <select value={model} onChange={event => void onModelChange?.(event.target.value)} aria-label="Donna model">
-              {!models.some(option => option.id === model) && <option value={model}>{model}</option>}
-              {nativeModels.length > 0 && <optgroup label="Codex">
-                {nativeModels.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-              </optgroup>}
-              {routerModels.length > 0 && <optgroup label="Codex Router">
-                {routerModels.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
-              </optgroup>}
-            </select>
-          </label>
+            <button type="button" className="donna-model__trigger" aria-haspopup="listbox" aria-expanded={modelOpen} onClick={() => setModelOpen(open => !open)}>
+              {models.find(option => option.id === model)?.label ?? model}<ChevronDown size={11} />
+            </button>
+            {modelOpen && (
+              <div className="donna-model__menu" role="listbox" aria-label="Available Donna models">
+                {!models.some(option => option.id === model) && <ModelOption id={model} label={model} active onSelect={() => setModelOpen(false)} />}
+                <ModelGroup label="Codex" options={nativeModels} activeModel={model} onSelect={selected => {
+                  setModelOpen(false);
+                  void onModelChange?.(selected);
+                }} />
+                <ModelGroup label="Codex Router" options={routerModels} activeModel={model} onSelect={selected => {
+                  setModelOpen(false);
+                  void onModelChange?.(selected);
+                }} />
+              </div>
+            )}
+          </div>
         </div>
         <textarea
           id="donna-message"
@@ -103,6 +128,36 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
         <button type="submit" aria-label="Send message" disabled={!message.trim() || sending}><ArrowUp size={16} /></button>
       </form>
     </aside>
+  );
+}
+
+function ModelGroup({ label, options, activeModel, onSelect }: {
+  label: string;
+  options: CodexModelOption[];
+  activeModel: string;
+  onSelect(model: string): void;
+}) {
+  if (options.length === 0) return null;
+  return (
+    <div className="donna-model__group" role="group" aria-label={label}>
+      <span>{label}</span>
+      {options.map(option => (
+        <ModelOption key={option.id} id={option.id} label={option.label} active={option.id === activeModel} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}
+
+function ModelOption({ id, label, active, onSelect }: {
+  id: string;
+  label: string;
+  active: boolean;
+  onSelect(model: string): void;
+}) {
+  return (
+    <button type="button" role="option" aria-selected={active} onClick={() => onSelect(id)}>
+      <span>{label}</span>{active && <Check size={13} />}
+    </button>
   );
 }
 

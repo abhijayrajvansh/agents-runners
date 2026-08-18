@@ -213,13 +213,12 @@ function buildBlockerMessage(project: ProjectConfig, ticket: Ticket, findings: s
       : "Review the runner finding, apply the suggested correction, then move the ticket to **Todo** to retry with the same persistent agent context.";
 
   return [
-    "## Blocker needs your decision",
-    `**Ticket:** ${ticket.title} (\`${ticket.id}\`)`,
-    `**What happened:** ${reason}`,
-    "### Available paths",
-    `1. **Recommended:** ${recommendation}`,
-    "2. **Retry now:** Move the ticket to **Todo** immediately and let the assigned developer try again.",
-    "3. **Replan:** Keep it blocked, edit the ticket details, or split the problem into a smaller recovery ticket.",
-    "Reply with **1**, **2**, or **3** (and any constraints). I’ll continue from your choice immediately."
+    `\`${ticket.title}\` is blocked.`,
+    reason,
+    `I recommend option 1: ${recommendation}`,
+    "1. Follow that recommendation.",
+    "2. Move the ticket to Todo now and retry with the same developer.",
+    "3. Keep it blocked while we edit or split the ticket.",
+    "Reply with 1, 2, or 3 and any constraint I should know about. I’ll act on it right away."
   ].join("\n\n");
 }
