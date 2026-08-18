@@ -1,5 +1,7 @@
 import { mkdir, open, readFile, rm, type FileHandle } from "node:fs/promises";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 
 import { WebSocket } from "ws";
 
@@ -8,6 +10,15 @@ import { ProjectConfigSchema } from "../domain/schema.js";
 import { projectConfigPath, projectRuntimePath } from "../platform/paths.js";
 import { RuntimeStore } from "../runtime/runtime-store.js";
 import { readDaemonStatus, stopDaemon } from "./daemon-client.js";
+
+const execFileAsync = promisify(execFile);
+const color = {
+  green: (value: string) => process.stdout.isTTY ? `\u001b[32m${value}\u001b[0m` : value,
+  red: (value: string) => process.stdout.isTTY ? `\u001b[31m${value}\u001b[0m` : value,
+  cyan: (value: string) => process.stdout.isTTY ? `\u001b[36m${value}\u001b[0m` : value,
+  bold: (value: string) => process.stdout.isTTY ? `\u001b[1m${value}\u001b[0m` : value,
+  dim: (value: string) => process.stdout.isTTY ? `\u001b[2m${value}\u001b[0m` : value
+};
 
 type SessionRecord = {
   pid: number;
@@ -112,22 +123,62 @@ export async function runProjectSession(
 export async function printProjectSessions(runtimeRoot: string): Promise<void> {
   const daemon = await readDaemonStatus(runtimeRoot);
   const roots = await new RuntimeStore(runtimeRoot).loadProjects();
-  process.stdout.write(`Daemon: ${daemon.running ? `running (PID ${daemon.pid})` : "stopped"}\n`);
+  process.stdout.write(`${color.bold("Codex Runners")}\n\n`);
+  process.stdout.write(`${daemon.running ? color.green("● Running") : color.red("● Stopped")}  Daemon`);
+  if (daemon.running) process.stdout.write(`  ${color.dim(`PID ${daemon.pid} · ${daemon.host}:${daemon.port}`)}`);
+  process.stdout.write("\n");
   if (roots.length === 0) {
-    process.stdout.write("No registered projects.\n");
+    process.stdout.write(`\n${color.dim("No registered projects.")}\n`);
     return;
   }
 
+  process.stdout.write(`\n${color.bold("Projects")}\n`);
   for (const root of roots) {
     try {
       const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(root), "utf8")));
       const session = await readProjectSession(root);
-      const state = session && isProcessAlive(session.pid) ? `active (PID ${session.pid})` : "registered";
+      const active = Boolean(session && isProcessAlive(session.pid));
       const url = `http://${config.server.host}:${config.server.port}/projects/${config.project.id}`;
-      process.stdout.write(`- ${config.project.name}: ${state}\n  ${url}\n  ${root}\n`);
+      process.stdout.write(`\n${active ? color.green("● Active") : color.red("● Inactive")}  ${color.bold(config.project.name)}`);
+      if (active && session) process.stdout.write(`  ${color.dim(`foreground PID ${session.pid}`)}`);
+      process.stdout.write(`\n  Board   ${color.cyan(url)}\n  Repo    ${root}\n`);
+      const tmux = await readTmuxSession(config.project.id);
+      if (!tmux) {
+        process.stdout.write(`  tmux    ${color.red("not running")}\n`);
+      } else {
+        process.stdout.write(`  tmux    ${color.green(tmux.name)}\n`);
+        for (const pane of tmux.panes) {
+          process.stdout.write(`          ${pane.window} · ${pane.command} · PID ${pane.pid}\n`);
+          process.stdout.write(`          ${color.dim(pane.path)}\n`);
+        }
+      }
     } catch {
       continue;
     }
+  }
+}
+
+async function readTmuxSession(projectId: string): Promise<{
+  name: string;
+  panes: Array<{ window: string; command: string; pid: string; path: string }>;
+} | null> {
+  const name = `codex-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  try {
+    const result = await execFileAsync("tmux", [
+      "list-panes",
+      "-s",
+      "-t",
+      name,
+      "-F",
+      "#{window_name}|#{pane_current_command}|#{pane_pid}|#{pane_current_path}"
+    ]);
+    const panes = result.stdout.trim().split(/\r?\n/).filter(Boolean).map(line => {
+      const [window = "unknown", command = "unknown", pid = "?", ...pathParts] = line.split("|");
+      return { window, command, pid, path: pathParts.join("|") };
+    });
+    return { name, panes };
+  } catch {
+    return null;
   }
 }
 
