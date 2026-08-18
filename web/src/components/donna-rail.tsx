@@ -51,10 +51,6 @@ export function DonnaRail({ projectName, messages = [], onSend, onCollapse }: Do
           <PanelLeftClose size={15} />
         </button>
       </header>
-      <div className="donna-context">
-        <span>Project manager</span>
-        <p>Shared across browser, terminal, and Codex sessions.</p>
-      </div>
       <div className="donna-messages" aria-live="polite" ref={messagesElement}>
         {(visibleMessages.length > 0 ? visibleMessages : [{
           id: "welcome",

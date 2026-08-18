@@ -109,7 +109,7 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .ticket-next { width: 100%; min-height: 29px; margin-top: 10px; display: flex; align-items: center; justify-content: space-between; padding: 0 7px; border: 0; border-radius: 6px; background: #f7f7f4; color: #777771; font-size: 9px; cursor: pointer; }
 .ticket-next:hover { background: #efefeb; color: var(--ink); }
 
-.donna-rail { min-width: 0; grid-column: 1; grid-row: 1; max-height: calc(100vh - 54px); position: sticky; top: 54px; display: grid; grid-template-rows: auto auto minmax(210px, 1fr) auto; border-right: 1px solid var(--line); background: white; }
+.donna-rail { min-width: 0; grid-column: 1; grid-row: 1; max-height: calc(100vh - 54px); position: sticky; top: 54px; display: grid; grid-template-rows: auto minmax(210px, 1fr) auto; border-right: 1px solid var(--line); background: white; }
 .donna-header { height: 72px; display: flex; align-items: center; gap: 11px; padding: 0 22px; border-bottom: 1px solid var(--line); }
 .donna-mark { display: grid; place-items: center; width: 33px; height: 33px; border-radius: 10px; background: var(--ink); color: white; }
 .donna-header > div:nth-child(2) { display: flex; flex-direction: column; }
@@ -119,8 +119,6 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .donna-collapse:hover { border-color: var(--line-strong); background: var(--soft); color: var(--ink); }
 .donna-reopen { position: fixed; top: 70px; left: 16px; z-index: 35; min-height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: rgba(255,255,255,.96); box-shadow: 0 8px 26px rgba(25,25,20,.08); color: var(--muted); font-size: 11px; cursor: pointer; backdrop-filter: blur(12px); }
 .donna-reopen:hover { background: var(--soft); color: var(--ink); }.donna-reopen kbd { margin-left: 2px; }
-.donna-context { margin: 16px 18px 0; padding: 13px; border-radius: 9px; background: var(--soft); }
-.donna-context span { font-size: 9px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; }.donna-context p { margin: 4px 0 0; color: var(--muted); font-size: 10px; line-height: 1.4; }
 .donna-messages { overflow-y: auto; display: flex; flex-direction: column; gap: 17px; padding: 22px; scroll-behavior: smooth; }
 .donna-message { max-width: 92%; }.donna-message--user { align-self: flex-end; padding: 9px 11px; border-radius: 10px 10px 2px 10px; background: var(--soft); }.donna-message > span { color: var(--faint); font-size: 9px; text-transform: uppercase; letter-spacing: .1em; }
 .donna-markdown { overflow-wrap: anywhere; font-size: 12px; line-height: 1.55; }

@@ -137,10 +137,15 @@ export async function printProjectSessions(runtimeRoot: string): Promise<void> {
     try {
       const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(root), "utf8")));
       const session = await readProjectSession(root);
-      const active = Boolean(session && isProcessAlive(session.pid));
+      const foreground = Boolean(session && isProcessAlive(session.pid));
+      const active = daemon.running;
       const url = `http://${config.server.host}:${config.server.port}/projects/${config.project.id}`;
       process.stdout.write(`\n${active ? color.green("● Active") : color.red("● Inactive")}  ${color.bold(config.project.name)}`);
-      if (active && session) process.stdout.write(`  ${color.dim(`foreground PID ${session.pid}`)}`);
+      if (foreground && session) {
+        process.stdout.write(`  ${color.dim(`foreground PID ${session.pid}`)}`);
+      } else if (active) {
+        process.stdout.write(`  ${color.dim("background")}`);
+      }
       process.stdout.write(`\n  Board   ${color.cyan(url)}\n  Repo    ${root}\n`);
       const tmux = await readTmuxSession(config.project.id);
       if (!tmux) {
