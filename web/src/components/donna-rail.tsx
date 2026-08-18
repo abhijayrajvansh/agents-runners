@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { ArrowUp, PanelLeftClose, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -16,6 +16,13 @@ export function DonnaRail({ projectName, messages = [], onSend, onCollapse }: Do
   const [sending, setSending] = useState(false);
   const [fallbackMessages, setFallbackMessages] = useState<DonnaConversationMessage[]>([]);
   const visibleMessages = messages.length > 0 ? messages : fallbackMessages;
+  const messagesElement = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = messagesElement.current;
+    if (!element) return;
+    element.scrollTop = element.scrollHeight;
+  }, [visibleMessages.length, sending]);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -48,7 +55,7 @@ export function DonnaRail({ projectName, messages = [], onSend, onCollapse }: Do
         <span>Project manager</span>
         <p>Shared across browser, terminal, and Codex sessions.</p>
       </div>
-      <div className="donna-messages" aria-live="polite">
+      <div className="donna-messages" aria-live="polite" ref={messagesElement}>
         {(visibleMessages.length > 0 ? visibleMessages : [{
           id: "welcome",
           author: "donna" as const,

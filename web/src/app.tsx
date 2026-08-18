@@ -6,7 +6,6 @@ import type { Ticket } from "../../src/domain/types.js";
 import { Board } from "./components/board.js";
 import { CommandPalette } from "./components/command-palette.js";
 import { DonnaRail } from "./components/donna-rail.js";
-import { RunnerInspector } from "./components/runner-inspector.js";
 import { TicketDrawer } from "./components/ticket-drawer.js";
 import { TopBar } from "./components/top-bar.js";
 import { useProject } from "./state/use-project.js";
@@ -77,6 +76,7 @@ export function App() {
       <TopBar
         projectName={state.project.project.name}
         branch={state.project.project.integrationBranch}
+        runners={state.runners}
         onCreate={createTicket}
       />
       {state.error && <div className="error-banner"><AlertCircle size={15} />{state.error}<button type="button" onClick={() => void state.refresh()}>Retry</button></div>}
@@ -123,7 +123,6 @@ export function App() {
           <PanelLeftOpen size={16} /><span>Donna</span><kbd>⌘B</kbd>
         </button>
       )}
-      {state.runners.length > 0 && <RunnerInspector runners={state.runners} />}
       <TicketDrawer
         open={drawerOpen}
         ticket={selectedTicket}
