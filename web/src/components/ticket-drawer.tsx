@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 import type { Ticket, TicketStatus } from "../../../src/domain/types.js";
+import { readableBlockerReason } from "../../../src/orchestration/blockers.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 
 export type TicketDrawerProps = {
@@ -36,6 +37,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
   if (!open) return null;
   const waitingForDependencies = Boolean(ticket?.dependencies.some(id => tickets.find(candidate => candidate.id === id)?.status !== "done"));
   const needsHumanInput = ticket?.status === "blocked" && (ticket.blocker?.kind ?? (waitingForDependencies ? "dependency" : "human_input")) === "human_input";
+  const blockerReason = readableBlockerReason(ticket?.blocker?.reason);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim() || saving) return;
@@ -82,7 +84,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
           {needsHumanInput && (
             <div className="human-input-panel">
               <strong>Human input required</strong>
-              <p>{ticket.blocker?.reason ?? "A runner needs guidance before work can continue."}</p>
+              <p>{blockerReason}</p>
               <label>Your response<textarea value={humanInput} onChange={event => setHumanInput(event.target.value)} rows={4} placeholder="Give the runner the missing decision, data, or instruction…" required /></label>
               <small>Saving your response moves this ticket to Todo and resumes its persistent agent automatically.</small>
             </div>
