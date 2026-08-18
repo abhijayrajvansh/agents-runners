@@ -9,7 +9,6 @@
   },
   "bin": {
     "codex-runners": "dist/bin/cli.mjs",
-    "codex-runner": "dist/bin/cli.mjs",
     "cr": "dist/bin/cli.mjs"
   },
   "scripts": {
