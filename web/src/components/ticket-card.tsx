@@ -75,6 +75,14 @@ export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact }
       >
         {ticket.title}
       </button>
+      {ticket.status === "blocked" && (
+        <span
+          className={`blocker-tag blocker-tag--${ticket.blocker?.kind ?? "human_input"}`}
+          title={ticket.blocker?.reason}
+        >
+          {ticket.blocker?.kind === "dependency" ? "Waiting for tickets" : "Needs human input"}
+        </span>
+      )}
       {!compact && ticket.description && <p>{ticket.description}</p>}
       {!compact && <div className="ticket-card__footer">
           <span className="priority-label"><CircleDot size={11} />{ticket.priority}</span>

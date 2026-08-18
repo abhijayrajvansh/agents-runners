@@ -24,12 +24,17 @@ export function buildStagePrompt(
       "Do not edit code. Return failed with reproducible findings when validation fails."
     ]
   }[runner.role];
+  const humanInput = ticket.comments
+    .filter(comment => comment.author === "Human input")
+    .map(comment => `- ${comment.body}`)
+    .join("\n");
   return [
     `You are ${runner.id}, the persistent ${runner.role} for ${project.project.name}.`,
     `Ticket ${ticket.id}: ${ticket.title}`,
     ticket.description,
     `Acceptance criteria:\n${ticket.acceptanceCriteria.map(item => `- ${item}`).join("\n") || "- Complete the described work."}`,
     runtime.findings.length ? `Findings to address:\n${runtime.findings.map(item => `- ${item}`).join("\n")}` : "",
+    humanInput ? `Human input received:\n${humanInput}` : "",
     ticket.developmentInstructions,
     ticket.qaInstructions,
     project.pools[runner.role].instructions,

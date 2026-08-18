@@ -19,6 +19,11 @@ export const TicketCommentSchema = z.object({
   createdAt: z.iso.datetime()
 }).strict();
 
+export const TicketBlockerSchema = z.object({
+  kind: z.enum(["dependency", "human_input"]),
+  reason: z.string().min(1)
+}).strict();
+
 export const TicketSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -30,6 +35,7 @@ export const TicketSchema = z.object({
   tags: z.array(z.string()).default([]),
   comments: z.array(TicketCommentSchema).default([]),
   dependencies: z.array(z.string()).default([]),
+  blocker: TicketBlockerSchema.nullable().optional(),
   preferredRole: RoleNameSchema.optional(),
   assignedRunnerId: z.string().optional(),
   developmentInstructions: z.string().default(""),

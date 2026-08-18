@@ -232,23 +232,13 @@ function buildBlockerMessage(project: ProjectConfig, ticket: Ticket, findings: s
   const unfinishedDependencies = ticket.dependencies
     .map(id => project.board.tickets.find(candidate => candidate.id === id))
     .filter(dependency => dependency?.status !== "done");
-  const missingContext = !ticket.description.trim() || ticket.acceptanceCriteria.length === 0;
   const reason = findings.find(finding => finding.trim())
+    ?? ticket.blocker?.reason
     ?? ticket.comments.at(-1)?.body
     ?? "No technical blocker was recorded by the runner.";
-  const recommendation = unfinishedDependencies.length > 0
-    ? `Complete the dependency ${unfinishedDependencies.map(dependency => `\`${dependency?.title ?? "unknown"}\``).join(", ")} first, then move this ticket to **Todo**.`
-    : missingContext
-      ? "Restore the missing description and acceptance criteria, then move the ticket to **Todo** for a clean retry."
-      : "Review the runner finding, apply the suggested correction, then move the ticket to **Todo** to retry with the same persistent agent context.";
-
-  return [
-    `\`${ticket.title}\` is blocked.`,
-    reason,
-    `I recommend option 1: ${recommendation}`,
-    "1. Follow that recommendation.",
-    "2. Move the ticket to Todo now and retry with the same developer.",
-    "3. Keep it blocked while we edit or split the ticket.",
-    "Reply with 1, 2, or 3 and any constraint I should know about. I’ll act on it right away."
-  ].join("\n\n");
+  if (ticket.blocker?.kind === "dependency" || unfinishedDependencies.length > 0) {
+    const names = unfinishedDependencies.map(dependency => `**${dependency?.title ?? "Unknown ticket"}**`).join(", ");
+    return `**${ticket.title}** is waiting for ${names}. It will resume automatically when ${unfinishedDependencies.length === 1 ? "that ticket is" : "those tickets are"} done.`;
+  }
+  return `**${ticket.title}** needs your input: ${reason}\n\nDouble-click the ticket, enter your response, and save it to resume automatically.`;
 }

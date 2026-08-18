@@ -19,6 +19,7 @@ export function TicketDrawer({ open, ticket, runners, onClose, onSave }: TicketD
   const [priority, setPriority] = useState<Ticket["priority"]>("medium");
   const [assignedRunnerId, setAssignedRunnerId] = useState("");
   const [acceptance, setAcceptance] = useState("");
+  const [humanInput, setHumanInput] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -28,21 +29,33 @@ export function TicketDrawer({ open, ticket, runners, onClose, onSave }: TicketD
     setPriority(ticket?.priority ?? "medium");
     setAssignedRunnerId(ticket?.assignedRunnerId ?? "");
     setAcceptance(ticket?.acceptanceCriteria.join("\n") ?? "");
+    setHumanInput("");
   }, [ticket, open]);
 
   if (!open) return null;
+  const needsHumanInput = ticket?.status === "blocked" && ticket.blocker?.kind !== "dependency";
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim() || saving) return;
     setSaving(true);
     try {
+      const response = humanInput.trim();
+      const resume = Boolean(needsHumanInput && response);
       await onSave({
         ...(ticket ? { id: ticket.id } : {}),
         title: title.trim(),
         description: description.trim(),
-        status,
+        status: resume ? "todo" : status,
         priority,
         acceptanceCriteria: acceptance.split("\n").map(value => value.trim()).filter(Boolean),
+        ...(resume ? {
+          comments: [...(ticket?.comments ?? []), {
+            id: `comment-${crypto.randomUUID()}`,
+            author: "Human input",
+            body: response,
+            createdAt: new Date().toISOString()
+          }]
+        } : {}),
         ...(assignedRunnerId ? { assignedRunnerId } : {})
       });
       onClose();
@@ -64,7 +77,15 @@ export function TicketDrawer({ open, ticket, runners, onClose, onSave }: TicketD
           </div>
           <label>Assign runner<select value={assignedRunnerId} onChange={event => setAssignedRunnerId(event.target.value)}><option value="">Automatic assignment</option>{runners.filter(runner => runner.role === "developer").map(runner => <option key={runner.id} value={runner.id}>{runner.id}</option>)}</select></label>
           <label>Acceptance criteria<textarea value={acceptance} onChange={event => setAcceptance(event.target.value)} rows={4} placeholder="One criterion per line" /></label>
-          <div className="drawer-actions"><button type="button" className="quiet-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button" disabled={!title.trim() || saving}>{saving ? "Saving…" : ticket ? "Save ticket" : "Create ticket"}</button></div>
+          {needsHumanInput && (
+            <div className="human-input-panel">
+              <strong>Human input required</strong>
+              <p>{ticket.blocker?.reason ?? "A runner needs guidance before work can continue."}</p>
+              <label>Your response<textarea value={humanInput} onChange={event => setHumanInput(event.target.value)} rows={4} placeholder="Give the runner the missing decision, data, or instruction…" required /></label>
+              <small>Saving your response moves this ticket to Todo and resumes its persistent agent automatically.</small>
+            </div>
+          )}
+          <div className="drawer-actions"><button type="button" className="quiet-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button" disabled={!title.trim() || saving || Boolean(needsHumanInput && !humanInput.trim())}>{saving ? "Saving…" : needsHumanInput ? "Save input & resume" : ticket ? "Save ticket" : "Create ticket"}</button></div>
         </form>
       </aside>
     </div>

@@ -139,7 +139,9 @@ export class ProjectRegistry {
     const current = project.config.board.tickets[index];
     if (!current) throw new ProjectRegistryError("TICKET_NOT_FOUND", `Ticket ${ticketId} was not found`);
     const now = new Date().toISOString();
-    const ticket = TicketSchema.parse({ ...current, ...patch, id: current.id, createdAt: current.createdAt, updatedAt: now });
+    const merged = { ...current, ...patch };
+    if ("status" in patch && patch.status !== "blocked" && !("blocker" in patch)) merged.blocker = null;
+    const ticket = TicketSchema.parse({ ...merged, id: current.id, createdAt: current.createdAt, updatedAt: now });
     const tickets = [...project.config.board.tickets];
     tickets[index] = ticket;
     const next = await project.store.write({

@@ -51,6 +51,7 @@ export class Scheduler {
     for (let cycle = 0; cycle < 1_000; cycle += 1) {
       const project = this.dependencies.registry.get(projectId);
       if (!project.automation.enabled) return;
+      if (await this.#reconcileBlockers(projectId, project)) continue;
       const candidates = eligibleTickets(project);
       const assignments: Array<{ ticket: Ticket; runner: RunnerRecord; pool: RunnerPool }> = [];
 
@@ -134,18 +135,70 @@ export class Scheduler {
       });
     }
     this.dependencies.runtime.setTicket(projectId, ticket.id, runtime);
-    await this.#updateTicketStatus(projectId, ticket.id, status);
+    const blocker = status === "blocked" ? blockerForResult(currentProject, ticket, result) : null;
+    await this.#updateTicket(projectId, ticket.id, { status, blocker });
   }
 
-  async #updateTicketStatus(projectId: string, ticketId: string, status: TicketStatus): Promise<void> {
+  async #reconcileBlockers(projectId: string, project: ProjectConfig): Promise<boolean> {
+    const done = new Set(project.board.tickets.filter(ticket => ticket.status === "done").map(ticket => ticket.id));
+    for (const ticket of project.board.tickets) {
+      const unfinished = ticket.dependencies.filter(dependency => !done.has(dependency));
+      if (project.automation.actionableStatuses.includes(ticket.status) && unfinished.length > 0) {
+        const names = unfinished.map(id => project.board.tickets.find(candidate => candidate.id === id)?.title ?? id);
+        await this.#updateTicket(projectId, ticket.id, {
+          status: "blocked",
+          blocker: { kind: "dependency", reason: `Waiting for ${names.join(", ")}` }
+        });
+        return true;
+      }
+      if (ticket.status !== "blocked") continue;
+      if (unfinished.length > 0 && ticket.blocker?.kind !== "dependency") {
+        const names = unfinished.map(id => project.board.tickets.find(candidate => candidate.id === id)?.title ?? id);
+        await this.#updateTicket(projectId, ticket.id, {
+          blocker: { kind: "dependency", reason: `Waiting for ${names.join(", ")}` }
+        });
+        return true;
+      }
+      if (unfinished.length === 0 && ticket.blocker?.kind === "dependency") {
+        await this.#updateTicket(projectId, ticket.id, { status: "todo", blocker: null });
+        return true;
+      }
+      if (!ticket.blocker) {
+        const runtime = this.dependencies.runtime.getTicket(projectId, ticket.id);
+        await this.#updateTicket(projectId, ticket.id, {
+          blocker: {
+            kind: "human_input",
+            reason: runtime.findings.find(finding => finding.trim()) ?? "A runner needs guidance before work can continue."
+          }
+        });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  async #updateTicket(projectId: string, ticketId: string, patch: Partial<Ticket>): Promise<void> {
     const previous = this.#mutationLocks.get(projectId) ?? Promise.resolve();
     const mutation = previous.then(async () => {
       const board = this.dependencies.registry.getBoard(projectId);
-      await this.dependencies.registry.updateTicket(projectId, ticketId, { status }, board.revision);
+      await this.dependencies.registry.updateTicket(projectId, ticketId, patch, board.revision);
     });
     this.#mutationLocks.set(projectId, mutation.catch(() => undefined));
     await mutation;
   }
+}
+
+function blockerForResult(project: ProjectConfig, ticket: Ticket, result: StageExecutionResult): NonNullable<Ticket["blocker"]> {
+  const done = new Set(project.board.tickets.filter(candidate => candidate.status === "done").map(candidate => candidate.id));
+  const unfinished = ticket.dependencies.filter(dependency => !done.has(dependency));
+  if (unfinished.length > 0) {
+    const names = unfinished.map(id => project.board.tickets.find(candidate => candidate.id === id)?.title ?? id);
+    return { kind: "dependency", reason: `Waiting for ${names.join(", ")}` };
+  }
+  return {
+    kind: "human_input",
+    reason: result.findings.find(finding => finding.trim()) ?? result.summary ?? "A runner needs guidance before work can continue."
+  };
 }
 
 function eligibleTickets(project: ProjectConfig): Ticket[] {

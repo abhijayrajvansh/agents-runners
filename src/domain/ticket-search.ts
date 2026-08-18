@@ -16,6 +16,7 @@ export function ticketSearchScore(query: string, projectName: string, ticket: Ti
     ...ticket.dependencies,
     ticket.developmentInstructions,
     ticket.qaInstructions,
+    ticket.blocker?.reason ?? "",
     ticket.assignedRunnerId ?? "",
     ...ticket.comments.flatMap(comment => [comment.author, comment.body])
   ].map(value => value.toLowerCase());
