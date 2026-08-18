@@ -43,7 +43,13 @@ export class CodexStageExecutor implements StageExecutor {
       env: { CODEX_RUNNERS_PROJECT_ROOT: input.project.project.repositoryRoot }
     };
     if (input.runner.threadId) turnInput.threadId = input.runner.threadId;
-    const result = await this.codex.runTurn(turnInput, event => this.onEvent?.(input, event));
+    const result = await this.codex.runTurn(turnInput, event => {
+      if (event.type === "thread.started") {
+        input.runner.threadId = event.threadId;
+        this.runtime?.setRunnerThread(input.project.project.id, input.runner.id, event.threadId);
+      }
+      this.onEvent?.(input, event);
+    });
     if (result.threadId) {
       input.runner.threadId = result.threadId;
       this.runtime?.setRunnerThread(input.project.project.id, input.runner.id, result.threadId);

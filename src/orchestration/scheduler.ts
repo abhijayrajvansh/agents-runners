@@ -115,6 +115,7 @@ export class Scheduler {
     if (runner.role === "developer" && !runtime.developerRunnerId) runtime.developerRunnerId = runner.id;
     if (runner.role === "reviewer") runtime.reviewerRunnerId = runner.id;
     if (runner.role === "qa") runtime.qaRunnerId = runner.id;
+    this.dependencies.runtime.setTicket(projectId, ticket.id, runtime);
     const execution: StageExecution = { project: currentProject, ticket, runner, runtime };
     const result = await this.dependencies.executor.execute(execution);
     let status: TicketStatus;

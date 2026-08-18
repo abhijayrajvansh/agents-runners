@@ -140,7 +140,8 @@ class PreparedStageExecutor implements StageExecutor {
       input.project,
       input.runner.worktreePath,
       target,
-      input.runner.role === "developer" ? "fast-forward" : "exact"
+      input.runner.role === "developer" ? "fast-forward" : "exact",
+      assignedRunnerId(input) === input.runner.id
     );
     return this.delegate.execute(input);
   }
@@ -148,6 +149,12 @@ class PreparedStageExecutor implements StageExecutor {
   integrate(input: StageExecution): Promise<{ commit: string }> {
     return this.delegate.integrate(input);
   }
+}
+
+function assignedRunnerId(input: StageExecution): string | undefined {
+  if (input.runner.role === "developer") return input.runtime.developerRunnerId;
+  if (input.runner.role === "reviewer") return input.runtime.reviewerRunnerId;
+  return input.runtime.qaRunnerId;
 }
 
 function sessionName(projectId: string): string {
