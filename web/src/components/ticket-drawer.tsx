@@ -2,7 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 import type { Ticket, TicketStatus } from "../../../src/domain/types.js";
-import { readableBlockerReason } from "../../../src/orchestration/blockers.js";
+import { humanBlockerPrompt, readableBlockerReason } from "../../../src/orchestration/blockers.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 
 export type TicketDrawerProps = {
@@ -38,6 +38,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
   const waitingForDependencies = Boolean(ticket?.dependencies.some(id => tickets.find(candidate => candidate.id === id)?.status !== "done"));
   const needsHumanInput = ticket?.status === "blocked" && (ticket.blocker?.kind ?? (waitingForDependencies ? "dependency" : "human_input")) === "human_input";
   const blockerReason = readableBlockerReason(ticket?.blocker?.reason);
+  const blockerPrompt = humanBlockerPrompt(ticket?.title ?? title, blockerReason);
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!title.trim() || saving) return;
@@ -83,9 +84,21 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
           <label>Acceptance criteria<textarea value={acceptance} onChange={event => setAcceptance(event.target.value)} rows={4} placeholder="One criterion per line" /></label>
           {needsHumanInput && (
             <div className="human-input-panel">
-              <strong>Human input required</strong>
-              <p>{blockerReason}</p>
-              <label>Your response<textarea value={humanInput} onChange={event => setHumanInput(event.target.value)} rows={4} placeholder="Give the runner the missing decision, data, or instruction…" required /></label>
+              <div className="human-input-panel__heading">
+                <strong>Runner needs your decision</strong>
+                <span>Answer one question to resume this ticket.</span>
+              </div>
+              <div className="human-input-panel__context">
+                <span>What happened</span>
+                <p>{blockerReason}</p>
+              </div>
+              <div className="human-input-panel__question">
+                <span>Question</span>
+                <strong>{blockerPrompt.question}</strong>
+                <p>{blockerPrompt.guidance}</p>
+              </div>
+              <label>Your answer<textarea value={humanInput} onChange={event => setHumanInput(event.target.value)} rows={4} placeholder={blockerPrompt.example} required /></label>
+              <small>Example: {blockerPrompt.example}</small>
               <small>Saving your response moves this ticket to Todo and resumes its persistent agent automatically.</small>
             </div>
           )}
