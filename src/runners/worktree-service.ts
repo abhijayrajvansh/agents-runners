@@ -51,6 +51,22 @@ export class WorktreeService {
     return { branch, worktreePath };
   }
 
+  async synchronize(
+    config: ProjectConfig,
+    worktreePath: string,
+    targetRef: string,
+    mode: "fast-forward" | "exact" = "fast-forward"
+  ): Promise<void> {
+    const status = await this.commands.run("git", ["status", "--porcelain"], { cwd: worktreePath });
+    if (status.stdout.trim()) throw new WorktreeServiceError(`Persistent worktree ${worktreePath} is dirty`);
+    await this.commands.run("git", ["fetch", config.project.remote], { cwd: worktreePath });
+    if (mode === "exact") {
+      await this.commands.run("git", ["reset", "--hard", targetRef], { cwd: worktreePath });
+    } else {
+      await this.commands.run("git", ["merge", "--ff-only", targetRef], { cwd: worktreePath });
+    }
+  }
+
   async #ensureWorktree(config: ProjectConfig, branch: string, worktreePath: string): Promise<void> {
     if (await exists(path.join(worktreePath, ".git"))) {
       const status = await this.commands.run("git", ["status", "--porcelain"], { cwd: worktreePath });

@@ -66,6 +66,7 @@ function execution(): StageExecution {
     priority: "high",
     type: "feature",
     tags: [],
+    comments: [],
     dependencies: [],
     assignedRunnerId: "developer-01",
     developmentInstructions: "Use the existing auth layer.",

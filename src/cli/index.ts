@@ -10,6 +10,7 @@ import path from "node:path";
 import { Command } from "commander";
 
 import { ProjectConfigSchema } from "../domain/schema.js";
+import { runDonnaClient } from "./donna-client.js";
 import { handleSessionStart } from "../hooks/session-start.js";
 import { initializeProject } from "../init/initialize-project.js";
 import { pluginRootFromModule, projectConfigPath } from "../platform/paths.js";
@@ -89,6 +90,14 @@ export function createCli(): Command {
       process.once("SIGTERM", () => void close());
       process.once("SIGINT", () => void close());
       await new Promise(() => undefined);
+    });
+
+  program.command("donna")
+    .description("Chat with the persistent Donna project manager")
+    .option("--root <path>", "initialized project root", process.cwd())
+    .action(async options => {
+      const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(options.root), "utf8")));
+      await runDonnaClient(config);
     });
 
   return program;

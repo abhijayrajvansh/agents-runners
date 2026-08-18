@@ -1,6 +1,9 @@
 import express, { type ErrorRequestHandler, type Express } from "express";
 import { ZodError } from "zod";
 
+import type { DonnaService, DonnaMessageSource } from "../donna/donna-service.js";
+import { MCP_TOOL_NAMES, type McpToolName, type McpTools } from "../mcp/tools.js";
+import type { AutomationManager } from "../orchestration/automation-manager.js";
 import { StoreError } from "../storage/atomic-json-store.js";
 import type { EventBus } from "./event-bus.js";
 import { ProjectRegistryError, type ProjectRegistry } from "./project-registry.js";
@@ -10,6 +13,9 @@ export type AppDependencies = {
   events: EventBus;
   version: string;
   onProjectRegistered?: (root: string) => Promise<void> | void;
+  donna?: DonnaService;
+  mcpTools?: McpTools;
+  automation?: Pick<AutomationManager, "list" | "get">;
 };
 
 export function createApp(dependencies: AppDependencies): Express {
@@ -63,6 +69,46 @@ export function createApp(dependencies: AppDependencies): Express {
       requiredRevision(body.expectedRevision)
     );
     response.json(result);
+  }));
+
+  app.get("/api/projects/:projectId/runners", asyncRoute(async (request, response) => {
+    const projectId = requiredParam(request.params.projectId);
+    dependencies.registry.get(projectId);
+    response.json({ runners: dependencies.automation?.list(projectId) ?? [] });
+  }));
+
+  app.get("/api/projects/:projectId/runners/:runnerId", asyncRoute(async (request, response) => {
+    const projectId = requiredParam(request.params.projectId);
+    dependencies.registry.get(projectId);
+    const runnerId = requiredParam(request.params.runnerId);
+    const runner = dependencies.automation?.get(projectId, runnerId);
+    if (!runner) {
+      response.status(404).json({ error: { code: "RUNNER_NOT_FOUND", message: `Runner ${runnerId} was not found` } });
+      return;
+    }
+    response.json(runner);
+  }));
+
+  app.post("/api/projects/:projectId/donna", asyncRoute(async (request, response) => {
+    if (!dependencies.donna) throw new Error("Donna is unavailable");
+    const body = request.body as { message?: unknown; source?: unknown };
+    if (typeof body.message !== "string" || body.message.trim().length === 0) throw new ZodError([]);
+    const source: DonnaMessageSource = body.source === "terminal" || body.source === "mcp" ? body.source : "browser";
+    const donnaEvents = [];
+    let message = "";
+    for await (const event of dependencies.donna.send(requiredParam(request.params.projectId), body.message, source)) {
+      donnaEvents.push(event);
+      if (event.type === "completed") message = event.message;
+      if (event.type === "error") throw new Error(event.message);
+    }
+    response.json({ message, events: donnaEvents });
+  }));
+
+  app.post("/api/mcp/:toolName", asyncRoute(async (request, response) => {
+    if (!dependencies.mcpTools) throw new Error("MCP tools are unavailable");
+    const toolName = requiredParam(request.params.toolName);
+    if (!MCP_TOOL_NAMES.includes(toolName as McpToolName)) throw new ZodError([]);
+    response.json(await dependencies.mcpTools.call(toolName as McpToolName, request.body));
   }));
 
   const errors: ErrorRequestHandler = (error, _request, response, _next) => {

@@ -4,6 +4,7 @@ import type { IntegrationService } from "../git/integration-service.js";
 import { projectRuntimePath } from "../platform/paths.js";
 import type { CodexEvent, CodexService, CodexTurnInput } from "../runners/codex-service.js";
 import type { TmuxPane } from "../runners/tmux-service.js";
+import type { ProjectRuntimeRepository } from "../runtime/project-runtime.js";
 import { buildStagePrompt } from "./ticket-prompts.js";
 import type { StageExecution, StageExecutionResult, StageExecutor } from "./scheduler.js";
 
@@ -14,15 +15,18 @@ export class CodexStageExecutor implements StageExecutor {
   readonly codex: CodexTurnRunner;
   readonly integration: BranchIntegrator;
   readonly onEvent: ((input: StageExecution, event: CodexEvent) => void) | undefined;
+  readonly runtime: ProjectRuntimeRepository | undefined;
 
   constructor(
     codex: CodexTurnRunner,
     integration: BranchIntegrator,
-    onEvent?: (input: StageExecution, event: CodexEvent) => void
+    onEvent?: (input: StageExecution, event: CodexEvent) => void,
+    runtime?: ProjectRuntimeRepository
   ) {
     this.codex = codex;
     this.integration = integration;
     this.onEvent = onEvent;
+    this.runtime = runtime;
   }
 
   async execute(input: StageExecution): Promise<StageExecutionResult> {
@@ -35,11 +39,15 @@ export class CodexStageExecutor implements StageExecutor {
       ),
       worktreePath: input.runner.worktreePath,
       prompt: buildStagePrompt(input.project, input.ticket, input.runner, input.runtime),
-      fullAccess: input.project.automation.fullAccess
+      fullAccess: input.project.automation.fullAccess,
+      env: { CODEX_RUNNERS_PROJECT_ROOT: input.project.project.repositoryRoot }
     };
     if (input.runner.threadId) turnInput.threadId = input.runner.threadId;
     const result = await this.codex.runTurn(turnInput, event => this.onEvent?.(input, event));
-    if (result.threadId) input.runner.threadId = result.threadId;
+    if (result.threadId) {
+      input.runner.threadId = result.threadId;
+      this.runtime?.setRunnerThread(input.project.project.id, input.runner.id, result.threadId);
+    }
     if (result.exitCode !== 0) {
       return {
         kind: "failed",
@@ -58,7 +66,10 @@ export class CodexStageExecutor implements StageExecutor {
       ...input.project.verification.build,
       ...input.project.verification.ui
     ];
-    const result = await this.integration.integrate(input.project, input.runner.branch, verification);
+    const candidateBranch = input.runtime.developerRunnerId
+      ? `${input.project.worktrees.branchPrefix}/${input.runtime.developerRunnerId}`
+      : input.runner.branch;
+    const result = await this.integration.integrate(input.project, candidateBranch, verification);
     return { commit: result.commit };
   }
 }

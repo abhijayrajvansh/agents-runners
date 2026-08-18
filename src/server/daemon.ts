@@ -1,5 +1,8 @@
 import { createServer, type Server } from "node:http";
 
+import { DonnaService } from "../donna/donna-service.js";
+import { McpTools } from "../mcp/tools.js";
+import { AutomationManager } from "../orchestration/automation-manager.js";
 import { createApp } from "./app.js";
 import { EventBus } from "./event-bus.js";
 import { ProjectRegistry } from "./project-registry.js";
@@ -31,11 +34,28 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
   for (const root of await runtime.loadProjects()) {
     await registry.register(root).catch(() => undefined);
   }
+  const automation = new AutomationManager(registry, events);
+  for (const project of registry.list()) automation.register(project.project.id);
+  const donna = new DonnaService({
+    registry,
+    events,
+    codex: automation.codex,
+    tmux: automation.tmux,
+    runtimeFor: project => automation.runtimeFor(project)
+  });
+  const mcpTools = new McpTools({ registry, events, runners: automation, donna });
   const app = createApp({
     registry,
     events,
     version: options.version,
-    onProjectRegistered: root => runtime.rememberProject(root)
+    automation,
+    donna,
+    mcpTools,
+    onProjectRegistered: async root => {
+      await runtime.rememberProject(root);
+      const project = await registry.register(root);
+      automation.register(project.project.id);
+    }
   });
   const server = createServer(app);
   const sockets = attachWebSocketServer(server, events);
@@ -44,6 +64,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     await listen(server, options.host, options.port);
   } catch (error) {
     registry.close();
+    automation.close();
     sockets.close();
     await releaseLock();
     throw error;
@@ -52,6 +73,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
   if (!address || typeof address === "string") {
     await closeServer(server);
     registry.close();
+    automation.close();
     sockets.close();
     await releaseLock();
     throw new Error("Codex Runners daemon did not bind a TCP address");
@@ -76,6 +98,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
       sockets.close();
       await closeServer(server);
       registry.close();
+      automation.close();
       await releaseLock();
     }
   };

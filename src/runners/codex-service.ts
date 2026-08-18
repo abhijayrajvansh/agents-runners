@@ -16,6 +16,7 @@ export type CodexTurnInput = {
   prompt: string;
   threadId?: string;
   fullAccess: boolean;
+  env?: Record<string, string>;
 };
 
 export class CodexService {
@@ -40,12 +41,37 @@ export class CodexService {
       command: this.codexCommand,
       args,
       runtimeDirectory: input.runtimeDirectory,
-      stdin: input.prompt
+      stdin: input.prompt,
+      ...(input.env ? { env: input.env } : {})
     });
-    const exitCode = await job.completion;
-    const lines = (await readFile(job.eventFile, "utf8")).split(/\r?\n/).filter(Boolean);
-    const events = lines.map(line => this.redactor.redact(parseCodexEvent(line)));
-    for (const event of events) onEvent?.(event);
+    const events: CodexEvent[] = [];
+    let processedLines = 0;
+    let completed = false;
+    const completion = job.completion.finally(() => { completed = true; });
+    const emitAvailable = async (includePartial: boolean) => {
+      let source: string;
+      try {
+        source = await readFile(job.eventFile, "utf8");
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT") return;
+        throw error;
+      }
+      const lines = source.split(/\r?\n/);
+      if (!includePartial && source.length > 0 && !/\r?\n$/.test(source)) lines.pop();
+      const available = lines.filter(Boolean);
+      for (const line of available.slice(processedLines)) {
+        const event = this.redactor.redact(parseCodexEvent(line));
+        events.push(event);
+        onEvent?.(event);
+      }
+      processedLines = available.length;
+    };
+    while (!completed) {
+      await emitAvailable(false);
+      if (!completed) await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    const exitCode = await completion;
+    await emitAvailable(true);
     const started = events.find(event => event.type === "thread.started");
     const messages = events.filter((event): event is Extract<CodexEvent, { type: "message.completed" }> => (
       event.type === "message.completed"

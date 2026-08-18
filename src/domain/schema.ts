@@ -12,6 +12,13 @@ export const TicketStatusSchema = z.enum([
 
 export const RoleNameSchema = z.enum(["developer", "reviewer", "qa"]);
 
+export const TicketCommentSchema = z.object({
+  id: z.string().min(1),
+  author: z.string().min(1),
+  body: z.string().min(1),
+  createdAt: z.iso.datetime()
+}).strict();
+
 export const TicketSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -21,6 +28,7 @@ export const TicketSchema = z.object({
   priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
   type: z.enum(["feature", "bug", "test", "review", "chore"]).default("feature"),
   tags: z.array(z.string()).default([]),
+  comments: z.array(TicketCommentSchema).default([]),
   dependencies: z.array(z.string()).default([]),
   preferredRole: RoleNameSchema.optional(),
   assignedRunnerId: z.string().optional(),

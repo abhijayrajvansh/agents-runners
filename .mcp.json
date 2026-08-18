@@ -1,3 +1,9 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "codex-runners": {
+      "command": "node",
+      "args": ["${__dirname}/dist/bin/mcp.mjs"],
+      "cwd": "."
+    }
+  }
 }
