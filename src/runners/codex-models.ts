@@ -18,24 +18,31 @@ export type CodexModelOption = {
   id: string;
   label: string;
   description: string;
+  source: "Codex" | "Codex Router";
 };
 
-const fallbackModels: CodexModelOption[] = [
-  { id: "gpt-5.6-luna", label: "GPT-5.6 Luna", description: "Fast and efficient for everyday coordination." },
-  { id: "gpt-5.6-terra", label: "GPT-5.6 Terra", description: "Balanced reasoning for complex project work." },
-  { id: "gpt-5.6-sol", label: "GPT-5.6 Sol", description: "Frontier reasoning for the hardest tasks." },
-  { id: "gpt-5.5", label: "GPT-5.5", description: "General-purpose Codex model." }
-];
-
 export async function listAvailableCodexModels(): Promise<CodexModelOption[]> {
-  try {
-    const raw = await readFile(join(homedir(), ".codex", "models_cache.json"), "utf8");
-    const cache = CachedModelsSchema.parse(JSON.parse(raw));
-    const models = cache.models
-      .filter(model => model.visibility !== "hide" && model.supported_in_api !== false)
-      .map(model => ({ id: model.slug, label: model.display_name, description: model.description }));
-    return models.length > 0 ? models : fallbackModels;
-  } catch {
-    return fallbackModels;
+  const sources = [
+    { path: join(homedir(), ".codex", "models_cache.json"), source: "Codex" as const },
+    { path: join(homedir(), ".codex", "codex-router", "merged-models.json"), source: "Codex Router" as const }
+  ];
+  const models = new Map<string, CodexModelOption>();
+  for (const source of sources) {
+    try {
+      const raw = await readFile(source.path, "utf8");
+      const cache = CachedModelsSchema.parse(JSON.parse(raw));
+      for (const model of cache.models) {
+        if (model.visibility === "hide" || model.supported_in_api === false || models.has(model.slug)) continue;
+        models.set(model.slug, {
+          id: model.slug,
+          label: model.display_name,
+          description: model.description,
+          source: source.source
+        });
+      }
+    } catch {
+      // A missing optional catalog only removes that provider from the selector.
+    }
   }
+  return [...models.values()];
 }

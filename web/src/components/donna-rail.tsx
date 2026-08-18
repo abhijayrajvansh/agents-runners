@@ -21,6 +21,8 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
   const [fallbackMessages, setFallbackMessages] = useState<DonnaConversationMessage[]>([]);
   const visibleMessages = messages.length > 0 ? messages : fallbackMessages;
   const messagesElement = useRef<HTMLDivElement>(null);
+  const nativeModels = models.filter(option => option.source === "Codex");
+  const routerModels = models.filter(option => option.source === "Codex Router");
 
   useEffect(() => {
     const element = messagesElement.current;
@@ -77,7 +79,12 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
             <span>Model</span>
             <select value={model} onChange={event => void onModelChange?.(event.target.value)} aria-label="Donna model">
               {!models.some(option => option.id === model) && <option value={model}>{model}</option>}
-              {models.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+              {nativeModels.length > 0 && <optgroup label="Codex">
+                {nativeModels.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+              </optgroup>}
+              {routerModels.length > 0 && <optgroup label="Codex Router">
+                {routerModels.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
+              </optgroup>}
             </select>
           </label>
         </div>
