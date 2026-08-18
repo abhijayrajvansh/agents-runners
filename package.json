@@ -1,0 +1,33 @@
+{
+  "name": "codex-runners",
+  "version": "0.1.0",
+  "description": "Local autonomous Kanban orchestration for persistent Codex runners",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "bin": {
+    "codex-runners": "dist/bin/cli.mjs"
+  },
+  "scripts": {
+    "build": "npm run build:node && npm run build:web",
+    "build:node": "tsup",
+    "build:web": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "gate": "npm run typecheck && npm test && npm run build && npm run test:e2e"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsup": "^8.5.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.1",
+    "vitest": "^4.1.11"
+  }
+}

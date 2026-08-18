@@ -7,4 +7,6 @@ coverage/
 .env.*
 !.env.example
 .superpowers/
-
+.vitest/
+test-results/
+playwright-report/
