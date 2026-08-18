@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler, type Express } from "express";
 import { ZodError } from "zod";
 
+import { ticketSearchScore } from "../domain/ticket-search.js";
 import type { DonnaService, DonnaMessageSource } from "../donna/donna-service.js";
 import { MCP_TOOL_NAMES, type McpToolName, type McpTools } from "../mcp/tools.js";
 import type { AutomationManager } from "../orchestration/automation-manager.js";
@@ -55,19 +56,14 @@ export function createApp(dependencies: AppDependencies): Express {
       return;
     }
     const results = dependencies.registry.list().flatMap(config => config.board.tickets
-      .filter(ticket => [
-        ticket.id,
-        ticket.title,
-        ticket.description,
-        ticket.status,
-        ticket.type,
-        ...ticket.acceptanceCriteria
-      ].some(value => value.toLowerCase().includes(query)) || config.project.name.toLowerCase().includes(query))
       .map(ticket => ({
         projectId: config.project.id,
         projectName: config.project.name,
-        ticket
-      })))
+        ticket,
+        score: ticketSearchScore(query, config.project.name, ticket)
+      }))
+      .filter(result => result.score >= 0))
+      .sort((left, right) => right.score - left.score || right.ticket.updatedAt.localeCompare(left.ticket.updatedAt))
       .slice(0, 50);
     response.json({ results });
   });

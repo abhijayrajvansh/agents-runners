@@ -1,6 +1,5 @@
 import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import type { RoleName } from "../../../src/domain/types.js";
-import { GlobalSearch } from "./global-search.js";
 
 export type TopBarProps = {
   projectName: string;
@@ -17,7 +16,6 @@ export function TopBar({ projectName, branch, poolMaximums, onSetPoolMaximum, on
         <div className="brand-mark">CR</div>
         <div><strong>Codex Runners</strong><span>{projectName} / {branch}</span></div>
       </div>
-      <GlobalSearch />
       <div className="top-actions">
         <div className="agent-counts" aria-label="Maximum agent counts">
           <AgentCapacity emoji="💻" label="developers" role="developer" maximum={poolMaximums.developer} onChange={onSetPoolMaximum} />

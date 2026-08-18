@@ -1,4 +1,5 @@
 import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../../../src/domain/types.js";
+import { ticketSearchScore } from "../../../src/domain/ticket-search.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
 import type { CodexModelOption } from "../../../src/runners/codex-models.js";
@@ -20,10 +21,18 @@ export class RunnersApi {
   }
 
   async searchTickets(query: string): Promise<Array<{ projectId: string; projectName: string; ticket: Ticket }>> {
-    const response = await this.#request<{ results: Array<{ projectId: string; projectName: string; ticket: Ticket }> }>(
-      `/api/search/tickets?q=${encodeURIComponent(query)}`
-    );
-    return response.results;
+    const response = await this.#request<{ projects: ProjectConfig["project"][] }>("/api/projects");
+    const projects = await Promise.all(response.projects.map(project => this.getProject(project.id)));
+    return projects.flatMap(project => project.board.tickets.map(ticket => ({
+      projectId: project.project.id,
+      projectName: project.project.name,
+      ticket,
+      score: ticketSearchScore(query, project.project.name, ticket)
+    })))
+      .filter(result => result.score >= 0)
+      .sort((left, right) => right.score - left.score || right.ticket.updatedAt.localeCompare(left.ticket.updatedAt))
+      .slice(0, 50)
+      .map(({ projectId, projectName, ticket }) => ({ projectId, projectName, ticket }));
   }
 
   async getProject(projectId: string): Promise<ProjectConfig> {
