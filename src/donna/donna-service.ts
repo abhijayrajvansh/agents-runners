@@ -67,6 +67,7 @@ export class DonnaService {
   ): Promise<void> {
     const project = this.dependencies.registry.get(projectId);
     const runtime = this.dependencies.runtimeFor(project);
+    const recentConversation = runtime.getDonnaMessages(projectId).slice(-8);
     const userMessage = runtime.appendDonnaMessage(projectId, { author: "user", text: message, source });
     this.dependencies.events.publish({
       type: "donna.user",
@@ -104,17 +105,16 @@ export class DonnaService {
     });
     emit({ type: "started", projectId, source });
     let lastMessage = "";
-    const threadId = runtime.getDonnaThread(projectId);
     const turnInput = {
       pane,
       runtimeDirectory: path.join(projectRuntimePath(project.project.repositoryRoot), "donna"),
       worktreePath: project.project.repositoryRoot,
-      prompt: buildDonnaPrompt(project, message),
+      prompt: buildDonnaPrompt(project, message, recentConversation),
       fullAccess: project.automation.fullAccess,
       model: project.donna?.model ?? "gpt-5.6-luna",
       reasoningEffort: project.donna?.reasoningEffort ?? "low",
-      env: { CODEX_RUNNERS_PROJECT_ROOT: project.project.repositoryRoot },
-      ...(threadId ? { threadId } : {})
+      timeoutMs: 45_000,
+      env: { CODEX_RUNNERS_PROJECT_ROOT: project.project.repositoryRoot }
     };
     const result = await this.dependencies.codex.runTurn(turnInput, (event: CodexEvent) => {
       if (event.type !== "message.completed") return;
@@ -124,7 +124,6 @@ export class DonnaService {
       this.#publish(projectId, donnaEvent);
     });
     if (result.exitCode !== 0) throw new Error(`Donna exited with code ${result.exitCode}: ${result.message}`);
-    if (result.threadId) runtime.setDonnaThread(projectId, result.threadId);
     if (result.message) runtime.appendDonnaMessage(projectId, { author: "donna", text: result.message, source });
     if (result.message && result.message !== lastMessage) {
       const messageEvent: DonnaEvent = { type: "message", projectId, text: result.message };
@@ -215,8 +214,11 @@ export class DonnaService {
   }
 }
 
-function buildDonnaPrompt(project: ProjectConfig, message: string): string {
+function buildDonnaPrompt(project: ProjectConfig, message: string, recentConversation: DonnaConversationMessage[]): string {
   const summary = project.board.tickets.map(ticket => `${ticket.id} [${ticket.status}] ${ticket.title}`).join("\n") || "No tickets yet.";
+  const conversation = recentConversation.length > 0
+    ? recentConversation.map(item => `${item.author === "donna" ? "Donna" : "User"}: ${item.text.slice(0, 1_500)}`).join("\n")
+    : "No earlier messages.";
   return [
     `You are Donna, the persistent project manager for ${project.project.name}.`,
     "Coordinate work through Codex Runners MCP tools. Create clear tickets, manage dependencies and assignments, inspect runner progress, and explain blockers. You are a project manager, not a coding worker. Never edit project files, run implementation commands, commit code, or perform a ticket yourself. Delegate implementation, review, and QA to the runner pools.",
@@ -226,6 +228,7 @@ function buildDonnaPrompt(project: ProjectConfig, message: string): string {
     "Keep replies short by default: no more than 100 words or five short lines unless the user asks for detail. For status or blocker questions, state only the current state, the cause, and your recommended next action. Do not list commits, branches, checks, or historical evidence unless asked. End with a question only when a real decision is required.",
     "Backlog is planning-only. Moving a ticket to Todo or another actionable column starts autonomous delivery. Actionable work never needs another confirmation. Do not ask the user for permission to assign runners, retry a failed stage, continue a recovery, or proceed through review and QA.",
     `Current board:\n${summary}`,
+    `Recent conversation:\n${conversation}`,
     `User message:\n${message}`
   ].join("\n\n");
 }

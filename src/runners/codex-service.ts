@@ -19,6 +19,7 @@ export type CodexTurnInput = {
   model?: string;
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
   env?: Record<string, string>;
+  timeoutMs?: number;
 };
 
 export class CodexService {
@@ -49,7 +50,13 @@ export class CodexService {
     const events: CodexEvent[] = [];
     let processedLines = 0;
     let completed = false;
+    let timedOut = false;
     const completion = job.completion.finally(() => { completed = true; });
+    const timeout = input.timeoutMs === undefined ? undefined : setTimeout(() => {
+      timedOut = true;
+      void this.tmux.interruptPane(input.pane.target).catch(() => undefined);
+    }, input.timeoutMs);
+    timeout?.unref();
     const emitAvailable = async (includePartial: boolean) => {
       let source: string;
       try {
@@ -72,8 +79,11 @@ export class CodexService {
       await emitAvailable(false);
       if (!completed) await new Promise(resolve => setTimeout(resolve, 20));
     }
-    const exitCode = await completion;
+    const exitCode = await completion.finally(() => {
+      if (timeout) clearTimeout(timeout);
+    });
     await emitAvailable(true);
+    if (timedOut) throw new Error(`Codex turn timed out after ${input.timeoutMs}ms`);
     const started = events.find(event => event.type === "thread.started");
     const messages = events.filter((event): event is Extract<CodexEvent, { type: "message.completed" }> => (
       event.type === "message.completed"

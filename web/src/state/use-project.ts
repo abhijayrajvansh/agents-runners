@@ -64,7 +64,9 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
     sequence.current = Math.max(sequence.current, event.sequence);
     setActivity(current => [...current, event].slice(-80));
     if (event.type === "config.error" && typeof event.payload.message === "string") setError(event.payload.message);
-    if (event.type.startsWith("donna.")) void api.getDonnaMessages(projectId).then(setDonnaMessages);
+    if (event.type === "donna.user" || event.type === "donna.completed" || event.type === "donna.blocker") {
+      void api.getDonnaMessages(projectId).then(setDonnaMessages);
+    }
     if (event.type.startsWith("ticket.") || event.type.startsWith("runner.") || event.type === "project.updated") {
       void refresh();
     }
@@ -122,7 +124,19 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
       createdAt: new Date().toISOString()
     }]);
     try {
-      return await api.messageDonna(projectId, message);
+      return await api.messageDonna(projectId, message, event => {
+        if (event.type !== "message") return;
+        setDonnaMessages(current => [...current, {
+          id: crypto.randomUUID(),
+          author: "donna",
+          text: event.text,
+          source: "browser",
+          createdAt: new Date().toISOString()
+        }]);
+      });
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+      throw caught;
     } finally {
       setDonnaMessages(await api.getDonnaMessages(projectId));
     }

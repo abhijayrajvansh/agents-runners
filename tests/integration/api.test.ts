@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import request from "supertest";
 
 import { createApp } from "../../src/server/app.js";
+import type { DonnaService } from "../../src/donna/donna-service.js";
 import { EventBus } from "../../src/server/event-bus.js";
 import { ProjectRegistry } from "../../src/server/project-registry.js";
 import { createInitializedProject } from "../helpers/initialized-project.js";
@@ -86,5 +87,35 @@ describe("Codex Runners API", () => {
     expect(response.body.error).toMatchObject({ code: "VALIDATION_ERROR" });
     expect(board.tickets).toHaveLength(0);
     expect(board.revision).toBe(1);
+  });
+
+  it("streams Donna events as newline-delimited JSON", async () => {
+    const project = await createInitializedProject();
+    cleanups.push(project.cleanup);
+    const events = new EventBus();
+    const registry = new ProjectRegistry(events);
+    const registered = await registry.register(project.root);
+    const donna = {
+      async *send() {
+        yield { type: "started", projectId: registered.project.id, source: "browser" };
+        yield { type: "message", projectId: registered.project.id, text: "Checking the board." };
+        yield { type: "completed", projectId: registered.project.id, message: "All tickets are moving." };
+      },
+      history: () => []
+    } as unknown as DonnaService;
+    const app = createApp({ registry, events, donna, version: "0.1.0" });
+
+    const response = await request(app)
+      .post(`/api/projects/${registered.project.id}/donna`)
+      .set("accept", "application/x-ndjson")
+      .send({ message: "Status", source: "browser" })
+      .expect("content-type", /application\/x-ndjson/)
+      .expect(200);
+
+    expect(response.text.trim().split("\n").map(line => JSON.parse(line))).toEqual([
+      { type: "started", projectId: registered.project.id, source: "browser" },
+      { type: "message", projectId: registered.project.id, text: "Checking the board." },
+      { type: "completed", projectId: registered.project.id, message: "All tickets are moving." }
+    ]);
   });
 });

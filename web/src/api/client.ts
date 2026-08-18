@@ -4,6 +4,7 @@ import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 import type { AgentTerminalSnapshot } from "../../../src/orchestration/automation-manager.js";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
 import type { CodexModelOption } from "../../../src/runners/codex-models.js";
+import type { DonnaEvent } from "../../../src/donna/donna-service.js";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -82,12 +83,38 @@ export class RunnersApi {
     );
   }
 
-  async messageDonna(projectId: string, message: string): Promise<string> {
-    const response = await this.#request<{ message: string }>(
-      `/api/projects/${encodeURIComponent(projectId)}/donna`,
-      { method: "POST", body: JSON.stringify({ message, source: "browser" }) }
-    );
-    return response.message;
+  async messageDonna(projectId: string, message: string, onEvent?: (event: DonnaEvent) => void): Promise<string> {
+    const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/donna`, {
+      method: "POST",
+      headers: { "accept": "application/x-ndjson", "content-type": "application/json" },
+      body: JSON.stringify({ message, source: "browser" })
+    });
+    if (!response.ok) {
+      const body = await response.json() as { error?: { message?: string } };
+      throw new ApiError(response.status, body.error?.message ?? `Request failed with ${response.status}`);
+    }
+    if (!response.body) throw new ApiError(502, "Donna returned an empty response stream");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let reply = "";
+    const consume = (line: string) => {
+      if (!line.trim()) return;
+      const event = JSON.parse(line) as DonnaEvent;
+      onEvent?.(event);
+      if (event.type === "completed") reply = event.message;
+      if (event.type === "error") throw new ApiError(502, event.message);
+    };
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? "";
+      for (const line of lines) consume(line);
+      if (done) break;
+    }
+    consume(buffer);
+    return reply;
   }
 
   async getDonnaMessages(projectId: string): Promise<DonnaConversationMessage[]> {

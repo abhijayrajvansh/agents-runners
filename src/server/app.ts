@@ -157,6 +157,20 @@ export function createApp(dependencies: AppDependencies): Express {
     const body = request.body as { message?: unknown; source?: unknown };
     if (typeof body.message !== "string" || body.message.trim().length === 0) throw new ZodError([]);
     const source: DonnaMessageSource = body.source === "terminal" || body.source === "mcp" ? body.source : "browser";
+    const stream = request.accepts(["application/x-ndjson", "json"]) === "application/x-ndjson";
+    if (stream) {
+      response.status(200);
+      response.setHeader("content-type", "application/x-ndjson; charset=utf-8");
+      response.setHeader("cache-control", "no-cache, no-transform");
+      response.setHeader("x-accel-buffering", "no");
+      response.flushHeaders();
+      for await (const event of dependencies.donna.send(requiredParam(request.params.projectId), body.message, source)) {
+        response.write(`${JSON.stringify(event)}\n`);
+        if (event.type === "error") break;
+      }
+      response.end();
+      return;
+    }
     const donnaEvents = [];
     let message = "";
     for await (const event of dependencies.donna.send(requiredParam(request.params.projectId), body.message, source)) {

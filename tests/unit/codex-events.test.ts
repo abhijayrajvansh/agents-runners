@@ -52,4 +52,30 @@ describe("Codex JSONL normalization", () => {
     await expect(turn).resolves.toMatchObject({ threadId: "thread-live", exitCode: 0 });
     await rm(root, { recursive: true, force: true });
   });
+
+  it("interrupts a Donna turn that exceeds its timeout", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "codex-timeout-"));
+    const eventFile = path.join(root, "events.jsonl");
+    await writeFile(eventFile, "", "utf8");
+    let finish: ((exitCode: number) => void) | undefined;
+    const completion = new Promise<number>(resolve => { finish = resolve; });
+    const tmux = {
+      runInPane: vi.fn(async () => ({ id: "job", eventFile, exitFile: path.join(root, "exit.json"), completion })),
+      interruptPane: vi.fn(async () => finish?.(130))
+    } as unknown as TmuxService;
+    const service = new CodexService(tmux, new Redactor([]));
+    const turn = service.runTurn({
+      pane: { session: "demo", window: "donna", target: "demo:donna", cwd: root },
+      runtimeDirectory: root,
+      worktreePath: root,
+      prompt: "Status",
+      fullAccess: false,
+      timeoutMs: 5
+    });
+    setTimeout(() => finish?.(130), 30);
+
+    await expect(turn).rejects.toThrow("timed out after 5ms");
+    expect(tmux.interruptPane).toHaveBeenCalledWith("demo:donna");
+    await rm(root, { recursive: true, force: true });
+  });
 });
