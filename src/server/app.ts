@@ -18,7 +18,7 @@ export type AppDependencies = {
   onProjectUnregistered?: (projectId: string, root: string) => Promise<void> | void;
   donna?: DonnaService;
   mcpTools?: McpTools;
-  automation?: Pick<AutomationManager, "list" | "get">;
+  automation?: Pick<AutomationManager, "list" | "get"> & Partial<Pick<AutomationManager, "terminals">>;
   publicDirectory?: string;
 };
 
@@ -144,6 +144,12 @@ export function createApp(dependencies: AppDependencies): Express {
       return;
     }
     response.json(runner);
+  }));
+
+  app.get("/api/projects/:projectId/terminals", asyncRoute(async (request, response) => {
+    const projectId = requiredParam(request.params.projectId);
+    dependencies.registry.get(projectId);
+    response.json({ terminals: await dependencies.automation?.terminals?.(projectId) ?? [] });
   }));
 
   app.post("/api/projects/:projectId/donna", asyncRoute(async (request, response) => {

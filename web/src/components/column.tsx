@@ -23,20 +23,22 @@ export type ColumnProps = {
   onMove(ticketId: string, status: TicketStatus, expectedRevision: number): Promise<void> | void;
   onOpenTicket(ticketId: string): void;
   compactCards: boolean;
+  label?: string;
 };
 
-export function Column({ status, tickets, allTickets, runners, revision, onMove, onOpenTicket, compactCards }: ColumnProps) {
+export function Column({ status, tickets, allTickets, runners, revision, onMove, onOpenTicket, compactCards, label }: ColumnProps) {
   const droppable = useDroppable({ id: status });
+  const displayLabel = label ?? labels[status];
   return (
     <section
       ref={droppable.setNodeRef}
       className="board-column"
       data-over={droppable.isOver || undefined}
       role="region"
-      aria-label={labels[status]}
+      aria-label={displayLabel}
     >
       <header className="column-header">
-        <div><span className={`status-dot status-dot--${status}`} />{labels[status]}</div>
+        <div><span className={`status-dot status-dot--${status}`} />{displayLabel}</div>
         <span>{String(tickets.length).padStart(2, "0")}</span>
       </header>
       <div className="column-cards">

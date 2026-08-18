@@ -14,7 +14,8 @@ describe("Board", () => {
     const onMove = vi.fn().mockResolvedValue(undefined);
     render(<Board project={projectFixture()} runners={[]} onMove={onMove} onOpenTicket={vi.fn()} />);
 
-    expect(screen.getAllByRole("region")).toHaveLength(7);
+    expect(screen.getAllByRole("region")).toHaveLength(6);
+    expect(screen.getByRole("region", { name: "Review & QA" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Backlog" })).toHaveTextContent("Build authentication");
     fireEvent.click(screen.getByRole("button", { name: "Move Build authentication to Todo" }));
 

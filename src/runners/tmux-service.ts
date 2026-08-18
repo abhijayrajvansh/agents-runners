@@ -75,6 +75,17 @@ export class TmuxService {
     await this.commands.run("tmux", ["send-keys", "-t", target, "C-c"]);
   }
 
+  async capturePane(target: string, lines = 160): Promise<string> {
+    const result = await this.commands.run("tmux", ["capture-pane", "-p", "-t", target, "-S", `-${lines}`]);
+    return result.stdout;
+  }
+
+  async inspectPane(target: string): Promise<{ command: string; pid: number }> {
+    const result = await this.commands.run("tmux", ["list-panes", "-t", target, "-F", "#{pane_current_command}\t#{pane_pid}"]);
+    const [command = "shell", pid = "0"] = result.stdout.trim().split("\t");
+    return { command, pid: Number.parseInt(pid, 10) || 0 };
+  }
+
   async #hasSession(session: string): Promise<boolean> {
     try {
       await this.commands.run("tmux", ["has-session", "-t", session]);

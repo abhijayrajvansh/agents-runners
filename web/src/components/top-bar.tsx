@@ -1,15 +1,17 @@
-import { ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, LayoutDashboard, Plus, TerminalSquare } from "lucide-react";
 import type { RoleName } from "../../../src/domain/types.js";
 
 export type TopBarProps = {
   projectName: string;
+  projectId: string;
   branch: string;
+  view: "board" | "terminals";
   poolMaximums: Record<RoleName, number>;
   onSetPoolMaximum(role: RoleName, maximum: number): Promise<void>;
   onCreate(): void;
 };
 
-export function TopBar({ projectName, branch, poolMaximums, onSetPoolMaximum, onCreate }: TopBarProps) {
+export function TopBar({ projectName, projectId, branch, view, poolMaximums, onSetPoolMaximum, onCreate }: TopBarProps) {
   return (
     <header className="top-bar">
       <div className="brand-lockup">
@@ -17,6 +19,10 @@ export function TopBar({ projectName, branch, poolMaximums, onSetPoolMaximum, on
         <div><strong>Codex Runners</strong><span>{projectName} / {branch}</span></div>
       </div>
       <div className="top-actions">
+        <nav className="view-switcher" aria-label="Project views">
+          <a data-active={view === "board" || undefined} href={`/projects/${encodeURIComponent(projectId)}`}><LayoutDashboard size={13} />Board</a>
+          <a data-active={view === "terminals" || undefined} href={`/projects/${encodeURIComponent(projectId)}/agents-terminals`}><TerminalSquare size={13} />Terminals</a>
+        </nav>
         <div className="agent-counts" aria-label="Maximum agent counts">
           <AgentCapacity emoji="💻" label="developers" role="developer" maximum={poolMaximums.developer} onChange={onSetPoolMaximum} />
           <AgentCapacity emoji="🔍" label="reviewers" role="reviewer" maximum={poolMaximums.reviewer} onChange={onSetPoolMaximum} />

@@ -22,6 +22,16 @@ type ProjectAutomation = {
   heartbeat: ReturnType<typeof setInterval>;
 };
 
+export type AgentTerminalSnapshot = {
+  id: string;
+  role: "donna" | RoleName;
+  status: "working" | "idle" | "unhealthy";
+  ticketId?: string;
+  command: string;
+  pid: number;
+  output: string;
+};
+
 export class AutomationManager {
   readonly registry: ProjectRegistry;
   readonly events: EventBus;
@@ -110,6 +120,30 @@ export class AutomationManager {
 
   get(projectId: string, runnerId: string): RunnerRecord | undefined {
     return this.list(projectId).find(runner => runner.id === runnerId);
+  }
+
+  async terminals(projectId: string): Promise<AgentTerminalSnapshot[]> {
+    this.registry.get(projectId);
+    const session = sessionName(projectId);
+    const windows = await this.tmux.listWindows(session).catch(() => []);
+    const runners = new Map(this.list(projectId).map(runner => [runner.id, runner]));
+    return Promise.all(windows.map(async id => {
+      const target = `${session}:${id}`;
+      const runner = runners.get(id);
+      const [pane, output] = await Promise.all([
+        this.tmux.inspectPane(target).catch(() => ({ command: "unavailable", pid: 0 })),
+        this.tmux.capturePane(target).catch(() => "Terminal output is temporarily unavailable.")
+      ]);
+      return {
+        id,
+        role: id === "donna" ? "donna" as const : runner?.role ?? roleFromRunnerId(id),
+        status: pane.pid === 0 ? "unhealthy" : runner?.status ?? "idle",
+        ...(runner?.ticketId ? { ticketId: runner.ticketId } : {}),
+        command: pane.command,
+        pid: pane.pid,
+        output: stripTerminalControl(output).trimEnd()
+      };
+    }));
   }
 
   runtimeFor(config: ProjectConfig): ProjectRuntimeRepository {
@@ -218,6 +252,19 @@ function assignedRunnerId(input: StageExecution): string | undefined {
 
 function sessionName(projectId: string): string {
   return `codex-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+}
+
+function roleFromRunnerId(id: string): RoleName {
+  if (id.startsWith("reviewer-")) return "reviewer";
+  if (id.startsWith("qa-")) return "qa";
+  return "developer";
+}
+
+function stripTerminalControl(value: string): string {
+  return value
+    .replace(/\u001B\][^\u0007]*(?:\u0007|\u001B\\)/g, "")
+    .replace(/\u001B\[[0-?]*[ -/]*[@-~]/g, "")
+    .replace(/\r/g, "");
 }
 
 function buildBlockerMessage(project: ProjectConfig, ticket: Ticket, findings: string[]): string {

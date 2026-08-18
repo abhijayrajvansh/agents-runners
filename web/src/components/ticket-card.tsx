@@ -35,8 +35,9 @@ export type TicketCardProps = {
 };
 
 export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, blockerKind }: TicketCardProps) {
-  const draggable = useDraggable({ id: ticket.id, data: { ticket } });
-  const upcoming = nextStatus[ticket.status];
+  const humanMovable = ticket.status === "backlog" || ticket.status === "blocked";
+  const draggable = useDraggable({ id: ticket.id, data: { ticket }, disabled: !humanMovable });
+  const upcoming = humanMovable ? nextStatus[ticket.status] : undefined;
   const style = {
     transform: CSS.Translate.toString(draggable.transform),
     opacity: draggable.isDragging ? 0.48 : 1
@@ -60,15 +61,17 @@ export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, 
           <span className="ticket-id" title={ticket.id}>{ticket.id}</span>
           {compact && runner && <span className="runner-pill">{runner.id.replace("-", " ")}</span>}
         </div>
-        <button
-          className="drag-handle"
-          type="button"
-          aria-label={`Drag ${ticket.title}`}
-          {...draggable.listeners}
-          {...draggable.attributes}
-        >
-          <GripVertical size={14} strokeWidth={1.7} />
-        </button>
+        {humanMovable && (
+          <button
+            className="drag-handle"
+            type="button"
+            aria-label={`Drag ${ticket.title}`}
+            {...draggable.listeners}
+            {...draggable.attributes}
+          >
+            <GripVertical size={14} strokeWidth={1.7} />
+          </button>
+        )}
       </div>
       <button
         className="ticket-card__title"

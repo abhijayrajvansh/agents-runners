@@ -4,6 +4,7 @@ import { AlertCircle, PanelLeftOpen, RefreshCw, Rows3 } from "lucide-react";
 
 import type { Ticket } from "../../src/domain/types.js";
 import { Board } from "./components/board.js";
+import { AgentTerminals } from "./components/agent-terminals.js";
 import { CommandPalette } from "./components/command-palette.js";
 import { DonnaRail } from "./components/donna-rail.js";
 import { TicketDrawer } from "./components/ticket-drawer.js";
@@ -12,6 +13,7 @@ import { useProject } from "./state/use-project.js";
 
 export function App() {
   const projectId = projectIdFromLocation();
+  const terminalView = window.location.pathname.endsWith("/agents-terminals");
   const requestedTicketId = new URLSearchParams(window.location.search).get("ticket");
   const state = useProject(projectId);
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -75,7 +77,9 @@ export function App() {
     <div className="app-shell" ref={shell}>
       <TopBar
         projectName={state.project.project.name}
+        projectId={state.project.project.id}
         branch={state.project.project.integrationBranch}
+        view={terminalView ? "terminals" : "board"}
         poolMaximums={{
           developer: state.project.pools.developer.max,
           reviewer: state.project.pools.reviewer.max,
@@ -85,7 +89,7 @@ export function App() {
         onCreate={createTicket}
       />
       {state.error && <div className="error-banner"><AlertCircle size={15} />{state.error}<button type="button" onClick={() => void state.refresh()}>Retry</button></div>}
-      <main className="workspace" data-donna-collapsed={!donnaOpen || undefined}>
+      {terminalView ? <AgentTerminals projectId={state.project.project.id} /> : <main className="workspace" data-donna-collapsed={!donnaOpen || undefined}>
         <section className="board-pane">
           <div className="workspace-heading">
             <div><span className="eyebrow">Autonomous delivery</span><h1>{state.project.project.name}</h1></div>
@@ -125,8 +129,8 @@ export function App() {
             onCollapse={() => setDonnaOpen(false)}
           />
         )}
-      </main>
-      {!donnaOpen && (
+      </main>}
+      {!terminalView && !donnaOpen && (
         <button type="button" className="donna-reopen" aria-label="Expand Donna (⌘B)" onClick={() => setDonnaOpen(true)}>
           <PanelLeftOpen size={16} /><span>Donna</span><kbd>⌘B</kbd>
         </button>

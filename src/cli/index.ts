@@ -21,6 +21,7 @@ import { pluginRootFromModule, projectConfigPath } from "../platform/paths.js";
 import { userRuntimeRoot } from "../platform/paths.js";
 import { ensureDaemonForProject } from "../runtime/daemon-launcher.js";
 import { startDaemon } from "../server/daemon.js";
+import type { RunnerRecord } from "../orchestration/runner-pool.js";
 
 const exec = promisify(execFile);
 
@@ -104,6 +105,7 @@ export function createCli(): Command {
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
       if (config.server.openBrowser) await exec("open", [result.url]);
       process.stdout.write(`Codex Runners started in the background.\n${result.url}\n`);
+      await printResumedAssignments(config);
     });
 
   program.command("stop")
@@ -136,6 +138,7 @@ export function createCli(): Command {
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
       if (config.server.openBrowser) await exec("open", [result.url]);
       process.stdout.write(`Codex Runners restarted in the background.\n${result.url}\n`);
+      await printResumedAssignments(config);
     });
 
   program.command("status")
@@ -202,6 +205,32 @@ async function loadOrInitializeProject(root: string) {
     });
     process.stdout.write(`Initialized Codex Runners · ${result.config.project.name}\n`);
     return result.config;
+  }
+}
+
+async function printResumedAssignments(config: Awaited<ReturnType<typeof loadProjectConfig>>): Promise<void> {
+  const url = `http://${config.server.host}:${config.server.port}/api/projects/${encodeURIComponent(config.project.id)}/runners`;
+  let assigned: RunnerRecord[] = [];
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    try {
+      const response = await fetch(url);
+      if (response.ok) {
+        const body = await response.json() as { runners?: RunnerRecord[] };
+        assigned = (body.runners ?? []).filter(runner => runner.status === "working" && runner.ticketId);
+        if (assigned.length > 0) break;
+      }
+    } catch {
+      // The daemon may still be provisioning persistent worktrees and tmux panes.
+    }
+    await new Promise(resolve => setTimeout(resolve, 150));
+  }
+  if (assigned.length === 0) {
+    process.stdout.write("\nNo active agent assignments to resume.\n");
+    return;
+  }
+  process.stdout.write("\nResumed agent assignments\n");
+  for (const runner of assigned) {
+    process.stdout.write(`● ${runner.id} · ${runner.role} · ${runner.ticketId}\n`);
   }
 }
 

@@ -1,6 +1,7 @@
 import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../../../src/domain/types.js";
 import { ticketSearchScore } from "../../../src/domain/ticket-search.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
+import type { AgentTerminalSnapshot } from "../../../src/orchestration/automation-manager.js";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
 import type { CodexModelOption } from "../../../src/runners/codex-models.js";
 
@@ -42,6 +43,11 @@ export class RunnersApi {
   async listRunners(projectId: string): Promise<RunnerRecord[]> {
     const response = await this.#request<{ runners: RunnerRecord[] }>(`/api/projects/${encodeURIComponent(projectId)}/runners`);
     return response.runners;
+  }
+
+  async listTerminals(projectId: string): Promise<AgentTerminalSnapshot[]> {
+    const response = await this.#request<{ terminals: AgentTerminalSnapshot[] }>(`/api/projects/${encodeURIComponent(projectId)}/terminals`);
+    return response.terminals;
   }
 
   async moveTicket(projectId: string, ticketId: string, status: TicketStatus, expectedRevision: number) {
