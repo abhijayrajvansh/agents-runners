@@ -93,8 +93,18 @@ export class Scheduler {
       }
 
       await Promise.all(prepared.map(async assignment => {
+        let ticket = assignment.ticket;
         try {
-          await this.#execute(projectId, assignment.ticket, assignment.runner);
+          while (true) {
+            const previousStatus = ticket.status;
+            const nextStatus = await this.#execute(projectId, ticket, assignment.runner);
+            if (!nextStatus || nextStatus !== previousStatus || nextStatus === "blocked") break;
+            const nextTicket = this.dependencies.registry.getBoard(projectId).tickets.find(candidate => candidate.id === ticket.id);
+            if (!nextTicket) break;
+            ticket = nextTicket;
+          }
+        } catch (error) {
+          await this.#blockExecutionError(projectId, ticket, assignment.runner, error);
         } finally {
           assignment.pool.release(assignment.runner.id);
           this.dependencies.events.publish({
@@ -109,10 +119,10 @@ export class Scheduler {
     throw new Error(`Scheduler exceeded 1000 reconciliation cycles for ${projectId}`);
   }
 
-  async #execute(projectId: string, queuedTicket: Ticket, runner: RunnerRecord): Promise<void> {
+  async #execute(projectId: string, queuedTicket: Ticket, runner: RunnerRecord): Promise<TicketStatus | null> {
     const currentProject = this.dependencies.registry.get(projectId);
     const ticket = currentProject.board.tickets.find(candidate => candidate.id === queuedTicket.id);
-    if (!ticket || !currentProject.automation.actionableStatuses.includes(ticket.status)) return;
+    if (!ticket || !currentProject.automation.actionableStatuses.includes(ticket.status)) return null;
     const runtime = this.dependencies.runtime.getTicket(projectId, ticket.id);
     if (runner.role === "developer" && !runtime.developerRunnerId) runtime.developerRunnerId = runner.id;
     if (runner.role === "reviewer") runtime.reviewerRunnerId = runner.id;
@@ -138,6 +148,24 @@ export class Scheduler {
     this.dependencies.runtime.setTicket(projectId, ticket.id, runtime);
     const blocker = status === "blocked" ? blockerForResult(currentProject, ticket, result) : null;
     await this.#updateTicket(projectId, ticket.id, { status, blocker });
+    return status;
+  }
+
+  async #blockExecutionError(projectId: string, ticket: Ticket, runner: RunnerRecord, error: unknown): Promise<void> {
+    const reason = readableBlockerReason(error instanceof Error ? error.message : String(error), "Runner preparation failed.");
+    const runtime = this.dependencies.runtime.getTicket(projectId, ticket.id);
+    runtime.findings = [reason];
+    this.dependencies.runtime.setTicket(projectId, ticket.id, runtime);
+    await this.#updateTicket(projectId, ticket.id, {
+      status: "blocked",
+      blocker: { kind: "human_input", reason }
+    });
+    this.dependencies.events.publish({
+      type: "automation.error",
+      projectId,
+      revision: this.dependencies.registry.getBoard(projectId).revision,
+      payload: { runnerId: runner.id, ticketId: ticket.id, message: reason }
+    });
   }
 
   async #reconcileBlockers(projectId: string, project: ProjectConfig): Promise<boolean> {

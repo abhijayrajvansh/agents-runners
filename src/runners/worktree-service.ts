@@ -29,6 +29,7 @@ export class WorktreeServiceError extends Error {
 
 export class WorktreeService {
   readonly commands: CommandRunner;
+  #fetches = new Map<string, Promise<void>>();
 
   constructor(commands: CommandRunner) {
     this.commands = commands;
@@ -55,7 +56,7 @@ export class WorktreeService {
     config: ProjectConfig,
     worktreePath: string,
     targetRef: string,
-    mode: "fast-forward" | "exact" = "fast-forward",
+    mode: "fast-forward" | "merge" | "exact" = "fast-forward",
     resumeDirty = false
   ): Promise<void> {
     const status = await this.commands.run("git", ["status", "--porcelain"], { cwd: worktreePath });
@@ -64,10 +65,18 @@ export class WorktreeService {
       throw new WorktreeServiceError(`Persistent worktree ${worktreePath} is dirty`);
     }
     if (await this.hasRemote(config)) {
-      await this.commands.run("git", ["fetch", config.project.remote], { cwd: worktreePath });
+      await this.#fetchRemote(config);
     }
     if (mode === "exact") {
       await this.commands.run("git", ["reset", "--hard", targetRef], { cwd: worktreePath });
+    } else if (mode === "merge") {
+      try {
+        await this.commands.run("git", ["merge", "--no-edit", targetRef], { cwd: worktreePath });
+      } catch (error) {
+        const conflicts = await this.commands.run("git", ["diff", "--name-only", "--diff-filter=U"], { cwd: worktreePath });
+        if (resumeDirty && conflicts.stdout.trim()) return;
+        throw error;
+      }
     } else {
       await this.commands.run("git", ["merge", "--ff-only", targetRef], { cwd: worktreePath });
     }
@@ -83,10 +92,23 @@ export class WorktreeService {
     }
   }
 
-  async integrationRef(config: ProjectConfig): Promise<string> {
+  async integrationRef(config: ProjectConfig, refresh = true): Promise<string> {
     if (!await this.hasRemote(config)) return config.project.integrationBranch;
-    await this.commands.run("git", ["fetch", config.project.remote], { cwd: config.project.repositoryRoot });
+    if (refresh) await this.#fetchRemote(config);
     return `${config.project.remote}/${config.project.integrationBranch}`;
+  }
+
+  async #fetchRemote(config: ProjectConfig): Promise<void> {
+    const key = `${config.project.repositoryRoot}\0${config.project.remote}`;
+    const active = this.#fetches.get(key);
+    if (active) return active;
+    const fetch = this.commands.run("git", ["fetch", config.project.remote], { cwd: config.project.repositoryRoot }).then(() => undefined);
+    this.#fetches.set(key, fetch);
+    try {
+      await fetch;
+    } finally {
+      if (this.#fetches.get(key) === fetch) this.#fetches.delete(key);
+    }
   }
 
   async #ensureWorktree(config: ProjectConfig, branch: string, worktreePath: string): Promise<void> {

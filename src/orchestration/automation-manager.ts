@@ -202,13 +202,13 @@ class PreparedStageExecutor implements StageExecutor {
 
   async execute(input: StageExecution): Promise<StageExecutionResult> {
     const target = input.runner.role === "developer" || !input.runtime.developerRunnerId
-      ? await this.worktrees.integrationRef(input.project)
+      ? await this.worktrees.integrationRef(input.project, false)
       : `${input.project.worktrees.branchPrefix}/${input.runtime.developerRunnerId}`;
     await this.worktrees.synchronize(
       input.project,
       input.runner.worktreePath,
       target,
-      input.runner.role === "developer" ? "fast-forward" : "exact",
+      input.runner.role === "developer" ? "merge" : "exact",
       assignedRunnerId(input) === input.runner.id
     );
     return this.delegate.execute(input);
