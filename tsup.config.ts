@@ -3,7 +3,9 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: {
     "bin/cli": "src/cli/index.ts",
-    "bin/mcp": "src/mcp/server.ts"
+    "bin/mcp": "src/mcp/server.ts",
+    "bin/start": "src/bin/shortcut.ts",
+    "bin/stop": "src/bin/shortcut.ts"
   },
   format: ["esm"],
   outDir: "dist",

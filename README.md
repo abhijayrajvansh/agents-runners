@@ -46,10 +46,18 @@ The SessionStart hook reuses or starts the loopback daemon, registers the projec
 ## Daily use
 
 ```bash
+codex-runners-start
+codex-runners-stop
+```
+
+Run either shortcut from an initialized project repository. `codex-runners-start` starts or reuses the shared daemon, registers the current project, and opens its board. `codex-runners-stop` stops the shared daemon while preserving tickets, branches, worktrees, tmux panes, and Codex thread IDs.
+
+The full CLI remains available for diagnostics and Donna:
+
+```bash
 codex-runners status
+codex-runners doctor
 codex-runners donna
-codex-runners open
-codex-runners stop
 ```
 
 The browser and terminal use the same persistent Donna thread. Stopping the daemon never deletes tickets, branches, worktrees, tmux identities, or Codex thread IDs.
