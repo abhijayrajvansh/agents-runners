@@ -13,7 +13,9 @@ import { ProjectConfigSchema } from "../domain/schema.js";
 import { handleSessionStart } from "../hooks/session-start.js";
 import { initializeProject } from "../init/initialize-project.js";
 import { pluginRootFromModule, projectConfigPath } from "../platform/paths.js";
+import { userRuntimeRoot } from "../platform/paths.js";
 import { ensureDaemonForProject } from "../runtime/daemon-launcher.js";
+import { startDaemon } from "../server/daemon.js";
 
 const exec = promisify(execFile);
 
@@ -69,6 +71,25 @@ export function createCli(): Command {
     });
     process.stdout.write(JSON.stringify(output));
   });
+
+  program.command("daemon")
+    .description("Run the Codex Runners background daemon")
+    .option("--port <port>", "loopback port", value => Number.parseInt(value, 10), 4777)
+    .action(async options => {
+      const daemon = await startDaemon({
+        host: "127.0.0.1",
+        port: options.port,
+        runtimeRoot: userRuntimeRoot(),
+        version: "0.1.0"
+      });
+      const close = async () => {
+        await daemon.close();
+        process.exit(0);
+      };
+      process.once("SIGTERM", () => void close());
+      process.once("SIGINT", () => void close());
+      await new Promise(() => undefined);
+    });
 
   return program;
 }

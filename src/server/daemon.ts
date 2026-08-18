@@ -1,0 +1,102 @@
+import { createServer, type Server } from "node:http";
+
+import { createApp } from "./app.js";
+import { EventBus } from "./event-bus.js";
+import { ProjectRegistry } from "./project-registry.js";
+import { attachWebSocketServer } from "./websocket-hub.js";
+import { RuntimeStore } from "../runtime/runtime-store.js";
+
+export type StartDaemonOptions = {
+  host: string;
+  port: number;
+  runtimeRoot: string;
+  version: string;
+};
+
+export type DaemonHandle = {
+  host: string;
+  port: number;
+  url: string;
+  close(): Promise<void>;
+};
+
+export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHandle> {
+  if (options.host !== "127.0.0.1") {
+    throw new Error("Codex Runners v1 only permits the 127.0.0.1 loopback host");
+  }
+  const runtime = new RuntimeStore(options.runtimeRoot);
+  const releaseLock = await runtime.acquireLock();
+  const events = new EventBus();
+  const registry = new ProjectRegistry(events);
+  for (const root of await runtime.loadProjects()) {
+    await registry.register(root).catch(() => undefined);
+  }
+  const app = createApp({
+    registry,
+    events,
+    version: options.version,
+    onProjectRegistered: root => runtime.rememberProject(root)
+  });
+  const server = createServer(app);
+  const sockets = attachWebSocketServer(server, events);
+
+  try {
+    await listen(server, options.host, options.port);
+  } catch (error) {
+    registry.close();
+    sockets.close();
+    await releaseLock();
+    throw error;
+  }
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    await closeServer(server);
+    registry.close();
+    sockets.close();
+    await releaseLock();
+    throw new Error("Codex Runners daemon did not bind a TCP address");
+  }
+  await runtime.writeMetadata({
+    pid: process.pid,
+    host: options.host,
+    port: address.port,
+    version: options.version,
+    startedAt: new Date().toISOString()
+  });
+  let closed = false;
+
+  return {
+    host: options.host,
+    port: address.port,
+    url: `http://${options.host}:${address.port}`,
+    async close() {
+      if (closed) return;
+      closed = true;
+      for (const client of sockets.clients) client.terminate();
+      sockets.close();
+      await closeServer(server);
+      registry.close();
+      await releaseLock();
+    }
+  };
+}
+
+function listen(server: Server, host: string, port: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, host, () => {
+      server.off("error", reject);
+      resolve();
+    });
+  });
+}
+
+function closeServer(server: Server): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (!server.listening) {
+      resolve();
+      return;
+    }
+    server.close(error => error ? reject(error) : resolve());
+  });
+}
