@@ -2,6 +2,7 @@
 
 import { execFile } from "node:child_process";
 import { spawn } from "node:child_process";
+import { realpathSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -173,6 +174,15 @@ function daemonDependencies(cliPath: string) {
   };
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+if (isMainModule(import.meta.url)) {
   await createCli().parseAsync(process.argv);
+}
+
+function isMainModule(moduleUrl: string): boolean {
+  if (!process.argv[1]) return false;
+  try {
+    return realpathSync(process.argv[1]) === realpathSync(fileURLToPath(moduleUrl));
+  } catch {
+    return path.resolve(process.argv[1]) === fileURLToPath(moduleUrl);
+  }
 }
