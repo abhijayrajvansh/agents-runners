@@ -85,6 +85,17 @@ export class DonnaService {
       this.#publish(projectId, completed);
       return;
     }
+    const resumed = await this.#resumeWorkRequest(project, message, source);
+    if (resumed) {
+      emit({ type: "started", projectId, source });
+      const messageEvent: DonnaEvent = { type: "message", projectId, text: resumed };
+      emit(messageEvent);
+      this.#publish(projectId, messageEvent);
+      const completed: DonnaEvent = { type: "completed", projectId, message: resumed };
+      emit(completed);
+      this.#publish(projectId, completed);
+      return;
+    }
     const session = sessionName(projectId);
     const pane = await this.dependencies.tmux.ensurePane({
       session,
@@ -169,6 +180,39 @@ export class DonnaService {
     });
     return reply;
   }
+
+  async #resumeWorkRequest(project: ProjectConfig, message: string, source: DonnaMessageSource): Promise<string | null> {
+    if (!isResumeRequest(message)) return null;
+    let board = this.dependencies.registry.getBoard(project.project.id);
+    const resumable = board.tickets.filter(candidate => candidate.status === "blocked" && candidate.blocker?.kind === "human_input");
+    const alreadyActive = board.tickets.filter(ticket => project.automation.actionableStatuses.includes(ticket.status)).length;
+    if (resumable.length === 0 && alreadyActive === 0) return null;
+    let resumed = 0;
+    for (const ticket of resumable) {
+      const result = await this.dependencies.registry.updateTicket(project.project.id, ticket.id, {
+        status: "todo",
+        blocker: null,
+        comments: [...ticket.comments, {
+          id: `comment-${crypto.randomUUID()}`,
+          author: "Human input",
+          body: message.trim(),
+          createdAt: new Date().toISOString()
+        }]
+      }, board.revision);
+      board = this.dependencies.registry.getBoard(project.project.id);
+      resumed += result.ticket.status === "todo" ? 1 : 0;
+    }
+    const active = board.tickets.filter(ticket => project.automation.actionableStatuses.includes(ticket.status)).length;
+    const reply = resumed > 0
+      ? `Resumed ${resumed} blocked ${resumed === 1 ? "ticket" : "tickets"}. ${active} ${active === 1 ? "ticket is" : "tickets are"} now moving automatically.`
+      : `${active} ${active === 1 ? "ticket is" : "tickets are"} already moving automatically. No confirmation is needed.`;
+    this.dependencies.runtimeFor(this.dependencies.registry.get(project.project.id)).appendDonnaMessage(project.project.id, {
+      author: "donna",
+      text: reply,
+      source
+    });
+    return reply;
+  }
 }
 
 function buildDonnaPrompt(project: ProjectConfig, message: string): string {
@@ -180,7 +224,7 @@ function buildDonnaPrompt(project: ProjectConfig, message: string): string {
     "Avoid corporate AI prose, forced enthusiasm, canned acknowledgments, rhetorical reversals, fake punchlines, and inflated claims. Do not say 'Great question', 'I hope this helps', 'let us dive in', or 'Would you like me to'. Prefer 'is' and 'has' over phrases like 'serves as' or 'boasts'. Do not use em dashes. Never invent facts, progress, blockers, commits, or citations.",
     "Use GitHub-flavored Markdown only when it makes the answer easier to scan. Keep headings rare, avoid bolding every label, put each list item on its own line, and use readable inline code for ticket IDs and commands.",
     "Keep replies short by default: no more than 100 words or five short lines unless the user asks for detail. For status or blocker questions, state only the current state, the cause, and your recommended next action. Do not list commits, branches, checks, or historical evidence unless asked. End with a question only when a real decision is required.",
-    "Backlog is planning-only. Moving a ticket to Todo or another actionable column starts autonomous delivery.",
+    "Backlog is planning-only. Moving a ticket to Todo or another actionable column starts autonomous delivery. Actionable work never needs another confirmation. Do not ask the user for permission to assign runners, retry a failed stage, continue a recovery, or proceed through review and QA.",
     `Current board:\n${summary}`,
     `User message:\n${message}`
   ].join("\n\n");
@@ -203,6 +247,10 @@ function parseWorkRequest(message: string): { title: string; planningOnly: boole
   const concise = subject.length > 0 ? subject : lower;
   const title = `${verb[0]?.toUpperCase() ?? "B"}${verb.slice(1)} ${concise}`.slice(0, 90).trim();
   return { title, planningOnly, urgent, type };
+}
+
+function isResumeRequest(message: string): boolean {
+  return /\b(?:do it|go ahead|continue|proceed|resume|retry|start the (?:fix|recovery)|don'?t wait)\b/i.test(message);
 }
 
 function sessionName(projectId: string): string {

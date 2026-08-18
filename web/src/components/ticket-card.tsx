@@ -57,7 +57,6 @@ export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, 
     >
       <div className="ticket-card__meta">
         <div className="ticket-card__identity">
-          <span className="ticket-kind">{ticket.type}</span>
           <span className="ticket-id" title={ticket.id}>{ticket.id}</span>
           {compact && runner && <span className="runner-pill">{runner.id.replace("-", " ")}</span>}
         </div>

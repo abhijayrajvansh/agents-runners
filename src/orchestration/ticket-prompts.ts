@@ -11,7 +11,7 @@ export function buildStagePrompt(
   const roleInstructions = {
     developer: [
       "Implement or repair the ticket in this persistent worktree.",
-      "Run the relevant verification, commit every completed change on this runner branch, and leave the worktree clean.",
+      "Run the relevant verification, commit every completed change on this runner branch, include .codex-runners/config.json if it is modified, push the runner branch, and leave the worktree clean.",
       "Do not merge or push the integration branch."
     ],
     reviewer: [

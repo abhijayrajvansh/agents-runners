@@ -92,9 +92,7 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .blocker-tag--dependency { background: #fff3dc; color: #97600b; }.blocker-tag--human_input { background: #fdebe8; color: #a33e35; }
 .ticket-card__meta, .ticket-card__footer { display: flex; align-items: center; justify-content: space-between; }
 .ticket-card__identity { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
-.ticket-kind { color: var(--muted); font-size: 9px; letter-spacing: .1em; text-transform: uppercase; }
 .ticket-id { max-width: 100%; overflow: hidden; color: #8b8b84; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 8px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-.ticket-kind + .ticket-id::before { margin-right: 6px; color: #c2c2bb; content: "·"; }
 .ticket-card[data-compact] .ticket-card__identity .runner-pill { font-size: 8px; }
 .drag-handle { display: grid; place-items: center; width: 24px; height: 24px; margin: -5px -5px 0 0; padding: 0; border: 0; background: none; color: #aaa; cursor: grab; }
 .drag-handle:active { cursor: grabbing; }

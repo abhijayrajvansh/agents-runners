@@ -20,8 +20,6 @@ type ProjectAutomation = {
   scheduler: Scheduler;
   unsubscribe: () => void;
   heartbeat: ReturnType<typeof setInterval>;
-  reconcilePromise: Promise<void> | null;
-  rerun: boolean;
 };
 
 export class AutomationManager {
@@ -83,7 +81,7 @@ export class AutomationManager {
     const unsubscribe = this.events.subscribe(projectId, event => this.#handleEvent(projectId, event));
     const heartbeat = setInterval(() => this.reconcile(projectId), 2_000);
     heartbeat.unref();
-    this.#projects.set(projectId, { runtime, pools, scheduler, unsubscribe, heartbeat, reconcilePromise: null, rerun: false });
+    this.#projects.set(projectId, { runtime, pools, scheduler, unsubscribe, heartbeat });
     for (const ticket of config.board.tickets.filter(candidate => candidate.status === "blocked")) {
       this.#notifyBlocker(projectId, ticket);
     }
@@ -93,16 +91,7 @@ export class AutomationManager {
   reconcile(projectId: string): void {
     const automation = this.#projects.get(projectId);
     if (!automation) return;
-    if (automation.reconcilePromise) {
-      automation.rerun = true;
-      return;
-    }
-    automation.reconcilePromise = (async () => {
-      do {
-        automation.rerun = false;
-        await automation.scheduler.reconcile(projectId);
-      } while (automation.rerun && this.#projects.has(projectId));
-    })().catch(error => {
+    void automation.scheduler.schedule(projectId).catch(error => {
       if (!this.#projects.has(projectId)) return;
       this.events.publish({
         type: "automation.error",
@@ -110,8 +99,6 @@ export class AutomationManager {
         revision: this.registry.getBoard(projectId).revision,
         payload: { message: error instanceof Error ? error.message : String(error) }
       });
-    }).finally(() => {
-      automation.reconcilePromise = null;
     });
   }
 
@@ -166,6 +153,10 @@ export class AutomationManager {
         ? this.registry.getBoard(projectId).tickets.find(candidate => candidate.id === ticketId)
         : undefined;
       if (ticket?.status === "blocked") this.#notifyBlocker(projectId, ticket);
+      if (ticket?.status === "backlog") {
+        const runner = this.list(projectId).find(candidate => candidate.ticketId === ticket.id);
+        if (runner) void this.tmux.interruptPane(runner.tmuxTarget).catch(() => undefined);
+      }
     }
     if (event.type === "ticket.created" || event.type === "ticket.updated" || event.type === "project.updated") {
       this.reconcile(projectId);

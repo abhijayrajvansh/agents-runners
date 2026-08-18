@@ -135,7 +135,11 @@ export class ProjectRegistry {
     const project = this.#requireProject(projectId);
     const index = project.config.board.tickets.findIndex(ticket => ticket.id === ticketId);
     if (index < 0) throw new ProjectRegistryError("TICKET_NOT_FOUND", `Ticket ${ticketId} was not found`);
-    const patch = TicketPatchSchema.parse(input);
+    const parsedPatch = TicketPatchSchema.parse(input);
+    const provided = input as Record<string, unknown>;
+    const patch = Object.fromEntries(
+      Object.entries(parsedPatch).filter(([field]) => Object.hasOwn(provided, field))
+    ) as z.infer<typeof TicketPatchSchema>;
     const current = project.config.board.tickets[index];
     if (!current) throw new ProjectRegistryError("TICKET_NOT_FOUND", `Ticket ${ticketId} was not found`);
     const now = new Date().toISOString();

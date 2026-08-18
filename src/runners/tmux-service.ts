@@ -71,6 +71,10 @@ export class TmuxService {
     await this.commands.run("tmux", ["kill-session", "-t", session]);
   }
 
+  async interruptPane(target: string): Promise<void> {
+    await this.commands.run("tmux", ["send-keys", "-t", target, "C-c"]);
+  }
+
   async #hasSession(session: string): Promise<boolean> {
     try {
       await this.commands.run("tmux", ["has-session", "-t", session]);
