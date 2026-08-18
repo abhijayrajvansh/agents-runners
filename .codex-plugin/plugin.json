@@ -1,19 +1,35 @@
 {
   "name": "codex-runners",
   "version": "0.1.0",
-  "description": "Codex Runners plugin",
+  "description": "Run a local realtime Kanban board with Donna and persistent autonomous Codex development, review, and QA pools.",
   "author": {
-    "name": "Local developer"
+    "name": "Abhijay Rajvansh"
   },
+  "license": "MIT",
+  "keywords": [
+    "codex",
+    "kanban",
+    "agents",
+    "automation",
+    "project-management",
+    "tmux",
+    "worktrees"
+  ],
   "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Codex Runners",
-    "shortDescription": "Use Codex Runners in Codex.",
-    "longDescription": "Codex Runners adds a local Codex plugin scaffold.",
-    "developerName": "Local developer",
+    "shortDescription": "Donna and autonomous Codex runner boards",
+    "longDescription": "Operate a white local Kanban workspace where Donna coordinates persistent Codex developers, reviewers, and QA runners from ticket creation through verified delivery.",
+    "developerName": "Abhijay Rajvansh",
     "category": "Productivity",
-    "capabilities": [],
-    "defaultPrompt": "Help me use Codex Runners."
-  },
-  "mcpServers": "./.mcp.json"
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Open this project's Codex Runners board.",
+      "Ask Donna to coordinate the next ticket."
+    ]
+  }
 }
