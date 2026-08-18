@@ -11,6 +11,9 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: false,
+  banner: {
+    js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);"
+  },
   outExtension: () => ({ js: ".mjs" }),
   noExternal: [/.*/]
 });
