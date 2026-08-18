@@ -107,9 +107,22 @@ export function createCli(): Command {
     });
 
   program.command("stop")
-    .description("Stop the shared daemon without removing persistent runner state")
-    .action(async () => {
-      process.stdout.write(`${JSON.stringify(await stopDaemon(userRuntimeRoot()), null, 2)}\n`);
+    .description("Stop one project, or stop the shared daemon when no project is given")
+    .argument("[project]", "project id or name")
+    .action(async project => {
+      if (!project) {
+        process.stdout.write(`${JSON.stringify(await stopDaemon(userRuntimeRoot()), null, 2)}\n`);
+        return;
+      }
+      const status = await readDaemonStatus(userRuntimeRoot());
+      if (!status.running || !status.host || !status.port) throw new Error("Codex Runners daemon is not running");
+      const response = await fetch(`http://${status.host}:${status.port}/api/projects/${encodeURIComponent(project)}`, {
+        method: "DELETE"
+      });
+      const body = await response.json() as { project?: { name?: string }; error?: { message?: string } };
+      if (!response.ok) throw new Error(body.error?.message ?? `Could not stop project ${project}`);
+      process.stdout.write(`Stopped Codex Runners · ${body.project?.name ?? project}\n`);
+      process.stdout.write("The shared daemon and other projects are still running.\n");
     });
 
   program.command("restart")

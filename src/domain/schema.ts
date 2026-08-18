@@ -88,13 +88,13 @@ export const ProjectConfigSchema = z.object({
     actionableStatuses: [...actionableStatuses]
   }),
   pools: z.object({
-    developer: RolePoolSchema.default({ max: 5, instructions: "" }),
-    reviewer: RolePoolSchema.default({ max: 5, instructions: "" }),
-    qa: RolePoolSchema.default({ max: 5, instructions: "" })
+    developer: RolePoolSchema.default({ max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" }),
+    reviewer: RolePoolSchema.default({ max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" }),
+    qa: RolePoolSchema.default({ max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" })
   }).strict().default({
-    developer: { max: 5, instructions: "" },
-    reviewer: { max: 5, instructions: "" },
-    qa: { max: 5, instructions: "" }
+    developer: { max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" },
+    reviewer: { max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" },
+    qa: { max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" }
   }),
   worktrees: z.object({
     root: z.string().min(1).default(".worktrees/codex-runners"),

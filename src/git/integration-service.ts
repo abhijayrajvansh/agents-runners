@@ -38,8 +38,8 @@ export class IntegrationService {
     verificationCommands: string[]
   ): Promise<{ commit: string; integrationWorktree: string }> {
     const integration = await this.worktrees.ensureIntegration(config);
-    const base = `${config.project.remote}/${config.project.integrationBranch}`;
-    await this.commands.run("git", ["fetch", config.project.remote], { cwd: integration.worktreePath });
+    const hasRemote = await this.worktrees.hasRemote(config);
+    const base = await this.worktrees.integrationRef(config);
     await this.commands.run("git", ["reset", "--hard", base], { cwd: integration.worktreePath });
     try {
       await this.commands.run("git", ["merge", "--no-ff", "--no-edit", candidateBranch], { cwd: integration.worktreePath });
@@ -58,12 +58,18 @@ export class IntegrationService {
     }
 
     const commit = (await this.commands.run("git", ["rev-parse", "HEAD"], { cwd: integration.worktreePath })).stdout.trim();
-    try {
-      await this.commands.run("git", ["push", config.project.remote, `HEAD:${config.project.integrationBranch}`], {
+    if (hasRemote && config.automation.autoPush) {
+      try {
+        await this.commands.run("git", ["push", config.project.remote, `HEAD:${config.project.integrationBranch}`], {
+          cwd: integration.worktreePath
+        });
+      } catch (error) {
+        throw new IntegrationError("PUSH_FAILED", `Could not push ${config.project.integrationBranch}`, error);
+      }
+    } else {
+      await this.commands.run("git", ["update-ref", `refs/heads/${config.project.integrationBranch}`, "HEAD"], {
         cwd: integration.worktreePath
       });
-    } catch (error) {
-      throw new IntegrationError("PUSH_FAILED", `Could not push ${config.project.integrationBranch}`, error);
     }
     return { commit, integrationWorktree: integration.worktreePath };
   }

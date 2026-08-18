@@ -14,6 +14,7 @@ export type AppDependencies = {
   events: EventBus;
   version: string;
   onProjectRegistered?: (root: string) => Promise<void> | void;
+  onProjectUnregistered?: (projectId: string, root: string) => Promise<void> | void;
   donna?: DonnaService;
   mcpTools?: McpTools;
   automation?: Pick<AutomationManager, "list" | "get">;
@@ -74,6 +75,17 @@ export function createApp(dependencies: AppDependencies): Express {
   app.get("/api/projects/:projectId", asyncRoute(async (request, response) => {
     const config = dependencies.registry.get(requiredParam(request.params.projectId));
     response.json(config);
+  }));
+
+  app.delete("/api/projects/:projectId", asyncRoute(async (request, response) => {
+    const requestedProject = requiredParam(request.params.projectId);
+    const config = dependencies.registry.list().find(candidate => (
+      candidate.project.id === requestedProject || candidate.project.name === requestedProject
+    ));
+    if (!config) throw new ProjectRegistryError("PROJECT_NOT_FOUND", `Project ${requestedProject} was not found`);
+    const projectId = config.project.id;
+    await dependencies.onProjectUnregistered?.(projectId, config.project.repositoryRoot);
+    response.json({ stopped: true, project: config.project });
   }));
 
   app.get("/api/projects/:projectId/board", asyncRoute(async (request, response) => {

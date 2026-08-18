@@ -69,6 +69,12 @@ export class RuntimeStore {
     await writeFile(this.projectsPath, `${JSON.stringify([...projects].sort(), null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
   }
 
+  async forgetProject(root: string): Promise<void> {
+    const projects = new Set(await this.loadProjects());
+    projects.delete(root);
+    await writeFile(this.projectsPath, `${JSON.stringify([...projects].sort(), null, 2)}\n`, { encoding: "utf8", mode: 0o600 });
+  }
+
   async #readLockPid(): Promise<number | null> {
     try {
       const value = JSON.parse(await readFile(this.lockPath, "utf8")) as { pid?: unknown };

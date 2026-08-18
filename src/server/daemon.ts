@@ -59,6 +59,11 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
       await runtime.rememberProject(root);
       const project = await registry.register(root);
       automation.register(project.project.id);
+    },
+    onProjectUnregistered: async (projectId, root) => {
+      await automation.unregister(projectId);
+      registry.unregister(projectId);
+      await runtime.forgetProject(root);
     }
   });
   const server = createServer(app);

@@ -63,7 +63,9 @@ export class WorktreeService {
       if (resumeDirty) return;
       throw new WorktreeServiceError(`Persistent worktree ${worktreePath} is dirty`);
     }
-    await this.commands.run("git", ["fetch", config.project.remote], { cwd: worktreePath });
+    if (await this.hasRemote(config)) {
+      await this.commands.run("git", ["fetch", config.project.remote], { cwd: worktreePath });
+    }
     if (mode === "exact") {
       await this.commands.run("git", ["reset", "--hard", targetRef], { cwd: worktreePath });
     } else {
@@ -71,13 +73,28 @@ export class WorktreeService {
     }
   }
 
+  async hasRemote(config: ProjectConfig): Promise<boolean> {
+    try {
+      await this.commands.run("git", ["remote", "get-url", config.project.remote], { cwd: config.project.repositoryRoot });
+      return true;
+    } catch (error) {
+      if (error instanceof CommandError) return false;
+      throw error;
+    }
+  }
+
+  async integrationRef(config: ProjectConfig): Promise<string> {
+    if (!await this.hasRemote(config)) return config.project.integrationBranch;
+    await this.commands.run("git", ["fetch", config.project.remote], { cwd: config.project.repositoryRoot });
+    return `${config.project.remote}/${config.project.integrationBranch}`;
+  }
+
   async #ensureWorktree(config: ProjectConfig, branch: string, worktreePath: string): Promise<void> {
     if (await exists(path.join(worktreePath, ".git"))) {
       return;
     }
     await mkdir(path.dirname(worktreePath), { recursive: true });
-    await this.commands.run("git", ["fetch", config.project.remote], { cwd: config.project.repositoryRoot });
-    const base = `${config.project.remote}/${config.project.integrationBranch}`;
+    const base = await this.integrationRef(config);
     const branchExists = await this.#branchExists(config.project.repositoryRoot, branch);
     const args = branchExists
       ? ["worktree", "add", worktreePath, branch]

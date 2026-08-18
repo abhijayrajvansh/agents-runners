@@ -119,6 +119,13 @@ export class AutomationManager {
     this.#projects.clear();
   }
 
+  async unregister(projectId: string): Promise<void> {
+    const automation = this.#projects.get(projectId);
+    if (automation) automation.unsubscribe();
+    this.#projects.delete(projectId);
+    await this.tmux.killSession(sessionName(projectId)).catch(() => undefined);
+  }
+
   #handleEvent(projectId: string, event: ProjectEvent): void {
     if (event.type === "project.updated") {
       const automation = this.#projects.get(projectId);
@@ -171,7 +178,7 @@ class PreparedStageExecutor implements StageExecutor {
 
   async execute(input: StageExecution): Promise<StageExecutionResult> {
     const target = input.runner.role === "developer" || !input.runtime.developerRunnerId
-      ? `${input.project.project.remote}/${input.project.project.integrationBranch}`
+      ? await this.worktrees.integrationRef(input.project)
       : `${input.project.worktrees.branchPrefix}/${input.runtime.developerRunnerId}`;
     await this.worktrees.synchronize(
       input.project,

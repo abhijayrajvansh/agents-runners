@@ -40,6 +40,8 @@ export class CodexStageExecutor implements StageExecutor {
       worktreePath: input.runner.worktreePath,
       prompt: buildStagePrompt(input.project, input.ticket, input.runner, input.runtime),
       fullAccess: input.project.automation.fullAccess,
+      model: input.project.pools[input.runner.role].model ?? "gpt-5.6-sol",
+      reasoningEffort: input.project.pools[input.runner.role].reasoningEffort ?? "medium",
       env: { CODEX_RUNNERS_PROJECT_ROOT: input.project.project.repositoryRoot }
     };
     if (input.runner.threadId) turnInput.threadId = input.runner.threadId;

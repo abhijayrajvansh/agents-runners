@@ -95,6 +95,12 @@ export class ProjectRegistry {
     return [...this.#projects.values()].map(project => project.config);
   }
 
+  unregister(projectId: string): void {
+    const project = this.#requireProject(projectId);
+    project.unwatch();
+    this.#projects.delete(projectId);
+  }
+
   async createTicket(projectId: string, input: unknown, expectedRevision: number): Promise<{ revision: number; ticket: Ticket }> {
     const project = this.#requireProject(projectId);
     const parsed = NewTicketSchema.parse(input);
