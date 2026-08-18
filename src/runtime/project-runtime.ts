@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, statSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 export type TicketRuntimeState = {
@@ -143,7 +143,7 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
       version: 1,
       tickets: parsed.tickets,
       donnaThreads: parsed.donnaThreads ?? {},
-      donnaMessages: parsed.donnaMessages ?? {},
+      donnaMessages: parsed.donnaMessages ?? loadLegacyDonnaMessages(path.dirname(this.filePath)),
       runnerThreads: parsed.runnerThreads ?? {}
     };
   }
@@ -151,4 +151,73 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
 
 function key(projectId: string, ticketId: string): string {
   return `${projectId}:${ticketId}`;
+}
+
+function loadLegacyDonnaMessages(runtimeDirectory: string): Record<string, DonnaConversationMessage[]> {
+  const donnaDirectory = path.join(runtimeDirectory, "donna");
+  if (!existsSync(donnaDirectory)) return {};
+  try {
+    const turns = readdirSync(donnaDirectory)
+      .filter(file => file.endsWith(".input"))
+      .map(file => {
+        const stem = file.slice(0, -".input".length);
+        const inputPath = path.join(donnaDirectory, file);
+        const eventsPath = path.join(donnaDirectory, `${stem}.events.jsonl`);
+        if (!existsSync(eventsPath)) return null;
+        const prompt = readFileSync(inputPath, "utf8");
+        const marker = "\n\nUser message:\n";
+        const markerIndex = prompt.lastIndexOf(marker);
+        const userText = markerIndex >= 0 ? prompt.slice(markerIndex + marker.length).trim() : "";
+        const assistantText = readFileSync(eventsPath, "utf8")
+          .split(/\r?\n/)
+          .filter(Boolean)
+          .map(line => {
+            try {
+              const event = JSON.parse(line) as { type?: unknown; item?: { type?: unknown; text?: unknown } };
+              return event.type === "item.completed" && event.item?.type === "agent_message" && typeof event.item.text === "string"
+                ? event.item.text
+                : "";
+            } catch {
+              return "";
+            }
+          })
+          .filter(Boolean)
+          .at(-1) ?? "";
+        if (!userText || !assistantText) return null;
+        return { userText, assistantText, timestamp: statSync(inputPath).mtimeMs };
+      })
+      .filter((turn): turn is { userText: string; assistantText: string; timestamp: number } => turn !== null)
+      .sort((left, right) => left.timestamp - right.timestamp);
+    if (turns.length === 0) return {};
+    const messages = turns.flatMap(turn => [
+      {
+        id: randomUUID(),
+        author: "user" as const,
+        text: turn.userText,
+        source: "browser" as const,
+        createdAt: new Date(turn.timestamp).toISOString()
+      },
+      {
+        id: randomUUID(),
+        author: "donna" as const,
+        text: turn.assistantText,
+        source: "browser" as const,
+        createdAt: new Date(turn.timestamp + 1).toISOString()
+      }
+    ]);
+    return { [projectIdFromRuntime(runtimeDirectory)]: messages };
+  } catch {
+    return {};
+  }
+}
+
+function projectIdFromRuntime(runtimeDirectory: string): string {
+  try {
+    const configPath = path.join(runtimeDirectory, "..", "config.json");
+    const config = JSON.parse(readFileSync(configPath, "utf8")) as { project?: { id?: unknown } };
+    if (typeof config.project?.id === "string") return config.project.id;
+  } catch {
+    // A missing project config simply disables legacy history import.
+  }
+  return "project";
 }
