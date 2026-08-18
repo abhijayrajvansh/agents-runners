@@ -1,0 +1,19 @@
+{
+  "name": "codex-runners",
+  "version": "0.1.0",
+  "description": "Codex Runners plugin",
+  "author": {
+    "name": "Local developer"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Runners",
+    "shortDescription": "Use Codex Runners in Codex.",
+    "longDescription": "Codex Runners adds a local Codex plugin scaffold.",
+    "developerName": "Local developer",
+    "category": "Productivity",
+    "capabilities": [],
+    "defaultPrompt": "Help me use Codex Runners."
+  },
+  "mcpServers": "./.mcp.json"
+}
