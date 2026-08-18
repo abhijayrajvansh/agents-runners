@@ -13,6 +13,7 @@ import { Command } from "commander";
 import { ProjectConfigSchema } from "../domain/schema.js";
 import { runDonnaClient } from "./donna-client.js";
 import { readDaemonStatus, stopDaemon } from "./daemon-client.js";
+import { printProjectSessions, ProjectSessionError, runProjectSession } from "./project-session.js";
 import { runDoctor } from "../doctor/doctor.js";
 import { handleSessionStart } from "../hooks/session-start.js";
 import { initializeProject } from "../init/initialize-project.js";
@@ -96,12 +97,17 @@ export function createCli(): Command {
     });
 
   program.command("start")
-    .description("Start the daemon and register this project")
+    .description("Start one foreground project session and stream live activity")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
       const config = await loadProjectConfig(options.root);
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
-      process.stdout.write(`${JSON.stringify({ running: true, url: result.url }, null, 2)}\n`);
+      await runProjectSession(
+        config,
+        result.url,
+        userRuntimeRoot(),
+        config.server.openBrowser ? async () => { await exec("open", [result.url]); } : undefined
+      );
     });
 
   program.command("stop")
@@ -114,6 +120,12 @@ export function createCli(): Command {
     .description("Show shared daemon status")
     .action(async () => {
       process.stdout.write(`${JSON.stringify(await readDaemonStatus(userRuntimeRoot()), null, 2)}\n`);
+    });
+
+  program.command("ls")
+    .description("List registered projects and active foreground sessions")
+    .action(async () => {
+      await printProjectSessions(userRuntimeRoot());
     });
 
   program.command("open")
@@ -175,7 +187,16 @@ function daemonDependencies(cliPath: string) {
 }
 
 if (isMainModule(import.meta.url)) {
-  await createCli().parseAsync(process.argv);
+  try {
+    await createCli().parseAsync(process.argv);
+  } catch (error) {
+    if (error instanceof ProjectSessionError) {
+      process.stderr.write(`error: ${error.message}\n`);
+      process.exitCode = 1;
+    } else {
+      throw error;
+    }
+  }
 }
 
 function isMainModule(moduleUrl: string): boolean {

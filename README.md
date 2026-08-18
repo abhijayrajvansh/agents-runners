@@ -50,12 +50,13 @@ codex-runners-start
 codex-runners-stop
 ```
 
-Run either shortcut from an initialized project repository. `codex-runners-start` starts or reuses the shared daemon, registers the current project, and opens its board. `codex-runners-stop` stops the shared daemon while preserving tickets, branches, worktrees, tmux panes, and Codex thread IDs.
+Run either shortcut from an initialized project repository. `codex-runners-start` opens the board and stays attached as a live activity log. A project can have only one attached session. Pressing `Ctrl+C` stops the shared daemon and exits cleanly. `codex-runners-stop` performs the same shutdown from another terminal while preserving tickets, branches, worktrees, tmux panes, and Codex thread IDs.
 
 The full CLI remains available for diagnostics and Donna:
 
 ```bash
 codex-runners status
+codex-runners ls
 codex-runners doctor
 codex-runners donna
 ```
