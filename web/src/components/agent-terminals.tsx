@@ -9,6 +9,7 @@ const api = new RunnersApi();
 export function AgentTerminals({ projectId }: { projectId: string }) {
   const [terminals, setTerminals] = useState<AgentTerminalSnapshot[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<"active" | "all">("active");
 
   useEffect(() => {
     let active = true;
@@ -31,16 +32,24 @@ export function AgentTerminals({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
 
+  const activeCount = terminals.filter(terminal => terminal.status === "working").length;
+  const visibleTerminals = filter === "active" ? terminals.filter(terminal => terminal.status === "working") : terminals;
   return (
     <main className="terminals-page">
       <div className="terminals-heading">
         <div><span className="eyebrow">Live agent workspace</span><h1>Agent terminals</h1></div>
-        <span><i /> Updating live</span>
+        <div className="terminals-toolbar">
+          <div className="terminal-filters" role="tablist" aria-label="Terminal filters">
+            <button type="button" role="tab" aria-selected={filter === "active"} onClick={() => setFilter("active")}>Active <span>{activeCount}</span></button>
+            <button type="button" role="tab" aria-selected={filter === "all"} onClick={() => setFilter("all")}>All <span>{terminals.length}</span></button>
+          </div>
+          <span className="terminals-live"><i /> Updating live</span>
+        </div>
       </div>
       {error && <div className="terminal-error">{error}</div>}
       <div className="terminal-grid">
-        {terminals.map(terminal => <TerminalCard key={terminal.id} terminal={terminal} />)}
-        {terminals.length === 0 && !error && <div className="terminal-empty"><TerminalSquare size={22} /><span>No agent terminals are provisioned yet.</span></div>}
+        {visibleTerminals.map(terminal => <TerminalCard key={terminal.id} terminal={terminal} />)}
+        {visibleTerminals.length === 0 && !error && <div className="terminal-empty"><TerminalSquare size={22} /><span>{filter === "active" ? "No agents are working right now." : "No agent terminals are provisioned yet."}</span></div>}
       </div>
     </main>
   );
