@@ -51,6 +51,7 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
   useEffect(() => connectProjectSocket(projectId, sequence.current, event => {
     sequence.current = Math.max(sequence.current, event.sequence);
     setActivity(current => [...current, event].slice(-80));
+    if (event.type === "config.error" && typeof event.payload.message === "string") setError(event.payload.message);
     if (event.type.startsWith("ticket.") || event.type.startsWith("runner.") || event.type === "project.updated") {
       void refresh();
     }

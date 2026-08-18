@@ -1,4 +1,6 @@
 import { createServer, type Server } from "node:http";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { DonnaService } from "../donna/donna-service.js";
 import { McpTools } from "../mcp/tools.js";
@@ -14,6 +16,7 @@ export type StartDaemonOptions = {
   port: number;
   runtimeRoot: string;
   version: string;
+  publicDirectory?: string;
 };
 
 export type DaemonHandle = {
@@ -51,6 +54,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     automation,
     donna,
     mcpTools,
+    publicDirectory: options.publicDirectory ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist/public"),
     onProjectRegistered: async root => {
       await runtime.rememberProject(root);
       const project = await registry.register(root);

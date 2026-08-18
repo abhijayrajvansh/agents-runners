@@ -80,16 +80,19 @@ export class AtomicJsonStore<T extends RevisionedDocument> {
     });
   }
 
-  watch(listener: (document: T) => void): () => void {
+  watch(listener: (document: T) => void, onError?: (error: unknown) => void): () => void {
     let watcher: FSWatcher | undefined;
     let timer: NodeJS.Timeout | undefined;
     const notify = () => {
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
-        void this.load().then(listener).catch(() => undefined);
+        void this.load().then(listener).catch(error => onError?.(error));
       }, 25);
     };
-    watcher = watchFile(this.filePath, { persistent: false }, notify);
+    const filename = path.basename(this.filePath);
+    watcher = watchFile(path.dirname(this.filePath), { persistent: false }, (_event, changed) => {
+      if (changed === null || changed.toString() === filename) notify();
+    });
 
     return () => {
       if (timer) clearTimeout(timer);

@@ -11,6 +11,8 @@ import { Command } from "commander";
 
 import { ProjectConfigSchema } from "../domain/schema.js";
 import { runDonnaClient } from "./donna-client.js";
+import { readDaemonStatus, stopDaemon } from "./daemon-client.js";
+import { runDoctor } from "../doctor/doctor.js";
 import { handleSessionStart } from "../hooks/session-start.js";
 import { initializeProject } from "../init/initialize-project.js";
 import { pluginRootFromModule, projectConfigPath } from "../platform/paths.js";
@@ -92,6 +94,45 @@ export function createCli(): Command {
       await new Promise(() => undefined);
     });
 
+  program.command("start")
+    .description("Start the daemon and register this project")
+    .option("--root <path>", "initialized project root", process.cwd())
+    .action(async options => {
+      const config = await loadProjectConfig(options.root);
+      const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
+      process.stdout.write(`${JSON.stringify({ running: true, url: result.url }, null, 2)}\n`);
+    });
+
+  program.command("stop")
+    .description("Stop the shared daemon without removing persistent runner state")
+    .action(async () => {
+      process.stdout.write(`${JSON.stringify(await stopDaemon(userRuntimeRoot()), null, 2)}\n`);
+    });
+
+  program.command("status")
+    .description("Show shared daemon status")
+    .action(async () => {
+      process.stdout.write(`${JSON.stringify(await readDaemonStatus(userRuntimeRoot()), null, 2)}\n`);
+    });
+
+  program.command("open")
+    .description("Open this project in Codex Runners")
+    .option("--root <path>", "initialized project root", process.cwd())
+    .action(async options => {
+      const config = await loadProjectConfig(options.root);
+      const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
+      await exec("open", [result.url]);
+    });
+
+  program.command("doctor")
+    .description("Check local Codex Runners prerequisites")
+    .option("--root <path>", "initialized project root", process.cwd())
+    .action(async options => {
+      const report = await runDoctor({ root: options.root });
+      process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+      if (!report.ok) process.exitCode = 1;
+    });
+
   program.command("donna")
     .description("Chat with the persistent Donna project manager")
     .option("--root <path>", "initialized project root", process.cwd())
@@ -107,6 +148,29 @@ async function readStdin(): Promise<string> {
   const chunks: Buffer[] = [];
   for await (const chunk of process.stdin) chunks.push(Buffer.from(chunk));
   return Buffer.concat(chunks).toString("utf8");
+}
+
+async function loadProjectConfig(root: string) {
+  return ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(root), "utf8")));
+}
+
+function daemonDependencies(cliPath: string) {
+  return {
+    request: async (url: string, options: { method: "GET" | "POST"; body?: Record<string, unknown> }) => {
+      const request: RequestInit = { method: options.method };
+      if (options.body) {
+        request.headers = { "content-type": "application/json" };
+        request.body = JSON.stringify(options.body);
+      }
+      const response = await fetch(url, request);
+      return { ok: response.ok };
+    },
+    spawnDaemon: async () => {
+      const child = spawn(process.execPath, [cliPath, "daemon"], { detached: true, stdio: "ignore" });
+      child.unref();
+    },
+    sleep: (milliseconds: number) => new Promise<void>(resolve => setTimeout(resolve, milliseconds))
+  };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

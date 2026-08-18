@@ -65,4 +65,25 @@ describe("AtomicJsonStore", () => {
 
     await expect(received).resolves.toBe("Renamed");
   });
+
+  it("keeps watching after an atomic replacement and reports a later invalid edit", async () => {
+    const { file, store } = await temporaryStore();
+    const first = await store.write(projectConfig(), 0);
+    let resolveInvalid: (() => void) | undefined;
+    const invalid = new Promise<void>(resolve => { resolveInvalid = resolve; });
+    const unwatch = store.watch(
+      () => undefined,
+      () => resolveInvalid?.()
+    );
+
+    await store.write(first, first.board.revision);
+    await new Promise(resolve => setTimeout(resolve, 80));
+    await writeFile(file, "{broken", "utf8");
+
+    await expect(Promise.race([
+      invalid,
+      new Promise((_, reject) => setTimeout(() => reject(new Error("watcher missed invalid replacement")), 500))
+    ])).resolves.toBeUndefined();
+    unwatch();
+  });
 });

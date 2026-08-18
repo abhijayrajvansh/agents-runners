@@ -1,4 +1,5 @@
 import express, { type ErrorRequestHandler, type Express } from "express";
+import path from "node:path";
 import { ZodError } from "zod";
 
 import type { DonnaService, DonnaMessageSource } from "../donna/donna-service.js";
@@ -16,6 +17,7 @@ export type AppDependencies = {
   donna?: DonnaService;
   mcpTools?: McpTools;
   automation?: Pick<AutomationManager, "list" | "get">;
+  publicDirectory?: string;
 };
 
 export function createApp(dependencies: AppDependencies): Express {
@@ -110,6 +112,13 @@ export function createApp(dependencies: AppDependencies): Express {
     if (!MCP_TOOL_NAMES.includes(toolName as McpToolName)) throw new ZodError([]);
     response.json(await dependencies.mcpTools.call(toolName as McpToolName, request.body));
   }));
+
+  if (dependencies.publicDirectory) {
+    app.use(express.static(dependencies.publicDirectory));
+    app.get("/{*splat}", (_request, response) => {
+      response.sendFile(path.join(dependencies.publicDirectory as string, "index.html"));
+    });
+  }
 
   const errors: ErrorRequestHandler = (error, _request, response, _next) => {
     if (error instanceof ZodError) {

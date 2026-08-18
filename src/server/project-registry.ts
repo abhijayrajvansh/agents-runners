@@ -57,15 +57,26 @@ export class ProjectRegistry {
       store,
       unwatch: () => undefined
     };
-    registered.unwatch = store.watch(next => {
-      registered.config = next;
-      this.events.publish({
-        type: "project.updated",
-        projectId: next.project.id,
-        revision: next.board.revision,
-        payload: { source: "file" }
-      });
-    });
+    registered.unwatch = store.watch(
+      next => {
+        if (next.board.revision < registered.config.board.revision) return;
+        registered.config = next;
+        this.events.publish({
+          type: "project.updated",
+          projectId: next.project.id,
+          revision: next.board.revision,
+          payload: { source: "file" }
+        });
+      },
+      () => {
+        this.events.publish({
+          type: "config.error",
+          projectId: registered.config.project.id,
+          revision: registered.config.board.revision,
+          payload: { message: `Configuration at ${projectConfigPath(root)} is invalid; the last valid board remains active.` }
+        });
+      }
+    );
     this.#projects.set(config.project.id, registered);
     return config;
   }
