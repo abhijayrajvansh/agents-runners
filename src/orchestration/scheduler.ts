@@ -2,6 +2,7 @@ import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../domain/ty
 import type { TicketRuntimeState, ProjectRuntimeRepository } from "../runtime/project-runtime.js";
 import type { EventBus } from "../server/event-bus.js";
 import type { ProjectRegistry } from "../server/project-registry.js";
+import { readableBlockerReason } from "./blockers.js";
 import { nextStage } from "./state-machine.js";
 import type { RunnerPool, RunnerRecord } from "./runner-pool.js";
 
@@ -168,10 +169,17 @@ export class Scheduler {
         await this.#updateTicket(projectId, ticket.id, {
           blocker: {
             kind: "human_input",
-            reason: runtime.findings.find(finding => finding.trim()) ?? "A runner needs guidance before work can continue."
+            reason: readableBlockerReason(runtime.findings.find(finding => finding.trim()))
           }
         });
         return true;
+      }
+      if (ticket.blocker.kind === "human_input") {
+        const reason = readableBlockerReason(ticket.blocker.reason);
+        if (reason !== ticket.blocker.reason) {
+          await this.#updateTicket(projectId, ticket.id, { blocker: { ...ticket.blocker, reason } });
+          return true;
+        }
       }
     }
     return false;
@@ -197,7 +205,7 @@ function blockerForResult(project: ProjectConfig, ticket: Ticket, result: StageE
   }
   return {
     kind: "human_input",
-    reason: result.findings.find(finding => finding.trim()) ?? result.summary ?? "A runner needs guidance before work can continue."
+    reason: readableBlockerReason(result.findings.find(finding => finding.trim()) ?? result.summary)
   };
 }
 

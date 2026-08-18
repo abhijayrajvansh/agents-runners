@@ -12,6 +12,7 @@ import type { ProjectRegistry } from "../server/project-registry.js";
 import { CodexStageExecutor } from "./codex-stage-executor.js";
 import { RunnerPool, type RunnerRecord } from "./runner-pool.js";
 import { Scheduler, type StageExecution, type StageExecutionResult, type StageExecutor } from "./scheduler.js";
+import { readableBlockerReason } from "./blockers.js";
 
 type ProjectAutomation = {
   runtime: ProjectRuntimeRepository;
@@ -232,10 +233,12 @@ function buildBlockerMessage(project: ProjectConfig, ticket: Ticket, findings: s
   const unfinishedDependencies = ticket.dependencies
     .map(id => project.board.tickets.find(candidate => candidate.id === id))
     .filter(dependency => dependency?.status !== "done");
-  const reason = findings.find(finding => finding.trim())
-    ?? ticket.blocker?.reason
-    ?? ticket.comments.at(-1)?.body
-    ?? "No technical blocker was recorded by the runner.";
+  const reason = readableBlockerReason(
+    ticket.blocker?.reason
+      ?? findings.find(finding => finding.trim())
+      ?? ticket.comments.at(-1)?.body,
+    "No technical blocker was recorded by the runner."
+  );
   if (ticket.blocker?.kind === "dependency" || unfinishedDependencies.length > 0) {
     const names = unfinishedDependencies.map(dependency => `**${dependency?.title ?? "Unknown ticket"}**`).join(", ");
     return `**${ticket.title}** is waiting for ${names}. It will resume automatically when ${unfinishedDependencies.length === 1 ? "that ticket is" : "those tickets are"} done.`;
