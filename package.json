@@ -21,6 +21,7 @@
     "gate": "npm run typecheck && npm test && npm run build && npm run test:e2e"
   },
   "dependencies": {
+    "commander": "^15.0.0",
     "zod": "^4.4.3"
   },
   "devDependencies": {
