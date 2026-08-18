@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import gsap from "gsap";
-import { AlertCircle, PanelRightOpen, RefreshCw } from "lucide-react";
+import { AlertCircle, PanelLeftOpen, RefreshCw, Rows3 } from "lucide-react";
 
 import type { Ticket } from "../../src/domain/types.js";
 import { Board } from "./components/board.js";
@@ -18,6 +18,7 @@ export function App() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [donnaOpen, setDonnaOpen] = useState(true);
+  const [compactCards, setCompactCards] = useState(() => localStorage.getItem("codex-runners:compact-cards") !== "false");
   const shell = useRef<HTMLDivElement>(null);
   const selectedTicket = useMemo<Ticket | null>(() => (
     state.project?.board.tickets.find(ticket => ticket.id === selectedTicketId) ?? null
@@ -69,11 +70,7 @@ export function App() {
       <TopBar
         projectName={state.project.project.name}
         branch={state.project.project.integrationBranch}
-        connected={state.connected}
-        runners={state.runners}
-        activity={state.activity}
         onCreate={createTicket}
-        onCommand={() => setPaletteOpen(true)}
       />
       {state.error && <div className="error-banner"><AlertCircle size={15} />{state.error}<button type="button" onClick={() => void state.refresh()}>Retry</button></div>}
       <main className="workspace" data-donna-collapsed={!donnaOpen || undefined}>
@@ -84,6 +81,17 @@ export function App() {
               <span><strong>{state.project.board.tickets.filter(ticket => ticket.status !== "done").length}</strong> open</span>
               <span><strong>{state.project.board.tickets.filter(ticket => ticket.status === "done").length}</strong> done</span>
               <span><strong>{state.runners.filter(runner => runner.status === "working").length}</strong> active</span>
+              <button
+                type="button"
+                className="card-density-toggle"
+                aria-pressed={compactCards}
+                onClick={() => setCompactCards(current => {
+                  localStorage.setItem("codex-runners:compact-cards", String(!current));
+                  return !current;
+                })}
+              >
+                <Rows3 size={13} /> {compactCards ? "Compact" : "Expanded"}
+              </button>
             </div>
           </div>
           <Board
@@ -91,11 +99,13 @@ export function App() {
             runners={state.runners}
             onMove={state.moveTicket}
             onOpenTicket={openTicket}
+            compactCards={compactCards}
           />
         </section>
         {donnaOpen && (
           <DonnaRail
             projectName={state.project.project.name}
+            messages={state.donnaMessages}
             onSend={state.messageDonna}
             onCollapse={() => setDonnaOpen(false)}
           />
@@ -103,10 +113,10 @@ export function App() {
       </main>
       {!donnaOpen && (
         <button type="button" className="donna-reopen" aria-label="Expand Donna (⌘B)" onClick={() => setDonnaOpen(true)}>
-          <PanelRightOpen size={16} /><span>Donna</span><kbd>⌘B</kbd>
+          <PanelLeftOpen size={16} /><span>Donna</span><kbd>⌘B</kbd>
         </button>
       )}
-      <RunnerInspector runners={state.runners} />
+      {state.runners.length > 0 && <RunnerInspector runners={state.runners} />}
       <TicketDrawer
         open={drawerOpen}
         ticket={selectedTicket}

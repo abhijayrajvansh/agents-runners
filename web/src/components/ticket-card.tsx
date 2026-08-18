@@ -30,9 +30,10 @@ export type TicketCardProps = {
   revision: number;
   onMove(ticketId: string, status: TicketStatus, expectedRevision: number): Promise<void> | void;
   onOpen(ticketId: string): void;
+  compact: boolean;
 };
 
-export function TicketCard({ ticket, runner, revision, onMove, onOpen }: TicketCardProps) {
+export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact }: TicketCardProps) {
   const draggable = useDraggable({ id: ticket.id, data: { ticket } });
   const upcoming = nextStatus[ticket.status];
   const style = {
@@ -41,7 +42,18 @@ export function TicketCard({ ticket, runner, revision, onMove, onOpen }: TicketC
   };
 
   return (
-    <article ref={draggable.setNodeRef} style={style} className="ticket-card" data-ticket-card data-priority={ticket.priority}>
+    <article
+      ref={draggable.setNodeRef}
+      style={style}
+      className="ticket-card"
+      data-ticket-card
+      data-compact={compact || undefined}
+      data-priority={ticket.priority}
+      onDoubleClick={event => {
+        if ((event.target as HTMLElement).closest(".drag-handle, .ticket-next, .ticket-card__title")) return;
+        onOpen(ticket.id);
+      }}
+    >
       <div className="ticket-card__meta">
         <span className="ticket-kind">{ticket.type}</span>
         <button
@@ -54,15 +66,21 @@ export function TicketCard({ ticket, runner, revision, onMove, onOpen }: TicketC
           <GripVertical size={14} strokeWidth={1.7} />
         </button>
       </div>
-      <button className="ticket-card__title" type="button" aria-label={`Open ${ticket.title}`} onClick={() => onOpen(ticket.id)}>
+      <button
+        className="ticket-card__title"
+        type="button"
+        aria-label={`Open ${ticket.title}`}
+        onClick={() => onOpen(ticket.id)}
+        onKeyDown={event => { if (event.key === "Enter") onOpen(ticket.id); }}
+      >
         {ticket.title}
       </button>
-      {ticket.description && <p>{ticket.description}</p>}
-      <div className="ticket-card__footer">
-        <span className="priority-label"><CircleDot size={11} />{ticket.priority}</span>
-        {runner ? <span className="runner-pill">{runner.id.replace("-", " ")}</span> : <span className="unassigned">Unassigned</span>}
-      </div>
-      {upcoming && (
+      {!compact && ticket.description && <p>{ticket.description}</p>}
+      {!compact && <div className="ticket-card__footer">
+          <span className="priority-label"><CircleDot size={11} />{ticket.priority}</span>
+          {runner ? <span className="runner-pill">{runner.id.replace("-", " ")}</span> : <span className="unassigned">Unassigned</span>}
+        </div>}
+      {!compact && upcoming && (
         <button
           type="button"
           className="ticket-next"

@@ -9,9 +9,10 @@ export type BoardProps = {
   runners: RunnerRecord[];
   onMove(ticketId: string, status: TicketStatus, expectedRevision: number): Promise<void> | void;
   onOpenTicket(ticketId: string): void;
+  compactCards?: boolean;
 };
 
-export function Board({ project, runners, onMove, onOpenTicket }: BoardProps) {
+export function Board({ project, runners, onMove, onOpenTicket, compactCards = false }: BoardProps) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const handleDragEnd = (event: DragEndEvent) => {
     const status = event.over?.id;
@@ -33,6 +34,7 @@ export function Board({ project, runners, onMove, onOpenTicket }: BoardProps) {
               revision={project.board.revision}
               onMove={onMove}
               onOpenTicket={onOpenTicket}
+              compactCards={compactCards}
             />
           ))}
         </div>

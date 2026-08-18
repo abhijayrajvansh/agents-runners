@@ -21,9 +21,10 @@ export type ColumnProps = {
   revision: number;
   onMove(ticketId: string, status: TicketStatus, expectedRevision: number): Promise<void> | void;
   onOpenTicket(ticketId: string): void;
+  compactCards: boolean;
 };
 
-export function Column({ status, tickets, runners, revision, onMove, onOpenTicket }: ColumnProps) {
+export function Column({ status, tickets, runners, revision, onMove, onOpenTicket, compactCards }: ColumnProps) {
   const droppable = useDroppable({ id: status });
   return (
     <section
@@ -46,6 +47,7 @@ export function Column({ status, tickets, runners, revision, onMove, onOpenTicke
             revision={revision}
             onMove={onMove}
             onOpen={onOpenTicket}
+            compact={compactCards}
           />
         ))}
         {tickets.length === 0 && <div className="column-empty">No tickets</div>}

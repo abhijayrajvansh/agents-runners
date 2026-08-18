@@ -1,39 +1,32 @@
 import { FormEvent, useState } from "react";
-import { ArrowUp, PanelRightClose, Sparkles } from "lucide-react";
-
-type Message = { id: string; author: "user" | "donna"; text: string };
+import { ArrowUp, PanelLeftClose, Sparkles } from "lucide-react";
+import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
 
 export type DonnaRailProps = {
   projectName: string;
+  messages?: DonnaConversationMessage[];
   onSend(message: string): Promise<string>;
   onCollapse(): void;
 };
 
-export function DonnaRail({ projectName, onSend, onCollapse }: DonnaRailProps) {
+export function DonnaRail({ projectName, messages = [], onSend, onCollapse }: DonnaRailProps) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
-  const [messages, setMessages] = useState<Message[]>([{
-    id: "welcome",
-    author: "donna",
-    text: `I’m Donna. I’ll coordinate ${projectName}, keep work moving, and surface decisions that need you.`
-  }]);
+  const [fallbackMessages, setFallbackMessages] = useState<DonnaConversationMessage[]>([]);
+  const visibleMessages = messages.length > 0 ? messages : fallbackMessages;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const value = message.trim();
     if (!value || sending) return;
     setMessage("");
-    setMessages(current => [...current, { id: crypto.randomUUID(), author: "user", text: value }]);
+    if (messages.length === 0) setFallbackMessages(current => [...current, localMessage("user", value)]);
     setSending(true);
     try {
       const reply = await onSend(value);
-      setMessages(current => [...current, { id: crypto.randomUUID(), author: "donna", text: reply }]);
-    } catch (caught) {
-      setMessages(current => [...current, {
-        id: crypto.randomUUID(),
-        author: "donna",
-        text: caught instanceof Error ? caught.message : "Donna could not complete that turn."
-      }]);
+      if (messages.length === 0) setFallbackMessages(current => [...current, localMessage("donna", reply)]);
+    } catch {
+      // The shared project error banner reports failed turns without creating fake history.
     } finally {
       setSending(false);
     }
@@ -46,7 +39,7 @@ export function DonnaRail({ projectName, onSend, onCollapse }: DonnaRailProps) {
         <div><strong>Donna</strong><span>{sending ? "Thinking" : "Available"}</span></div>
         <span className={`presence-dot ${sending ? "presence-dot--busy" : ""}`} />
         <button type="button" className="donna-collapse" aria-label="Collapse Donna (⌘B)" onClick={onCollapse} title="Collapse Donna (⌘B)">
-          <PanelRightClose size={15} />
+          <PanelLeftClose size={15} />
         </button>
       </header>
       <div className="donna-context">
@@ -54,7 +47,11 @@ export function DonnaRail({ projectName, onSend, onCollapse }: DonnaRailProps) {
         <p>Shared across browser, terminal, and Codex sessions.</p>
       </div>
       <div className="donna-messages" aria-live="polite">
-        {messages.map(item => (
+        {(visibleMessages.length > 0 ? visibleMessages : [{
+          id: "welcome",
+          author: "donna" as const,
+          text: `I’m Donna. I’ll coordinate ${projectName}, keep work moving, and surface decisions that need you.`
+        }]).map(item => (
           <div key={item.id} className={`donna-message donna-message--${item.author}`}>
             <span>{item.author === "donna" ? "Donna" : "You"}</span>
             <p>{item.text}</p>
@@ -75,4 +72,8 @@ export function DonnaRail({ projectName, onSend, onCollapse }: DonnaRailProps) {
       </form>
     </aside>
   );
+}
+
+function localMessage(author: "user" | "donna", text: string): DonnaConversationMessage {
+  return { id: crypto.randomUUID(), author, text, source: "browser", createdAt: new Date().toISOString() };
 }

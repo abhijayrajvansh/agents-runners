@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
@@ -10,11 +11,21 @@ export type TicketRuntimeState = {
   integrationCommit?: string;
 };
 
+export type DonnaConversationMessage = {
+  id: string;
+  author: "user" | "donna";
+  text: string;
+  source: "browser" | "terminal" | "mcp";
+  createdAt: string;
+};
+
 export interface ProjectRuntimeRepository {
   getTicket(projectId: string, ticketId: string): TicketRuntimeState;
   setTicket(projectId: string, ticketId: string, state: TicketRuntimeState): void;
   getDonnaThread(projectId: string): string | undefined;
   setDonnaThread(projectId: string, threadId: string): void;
+  getDonnaMessages(projectId: string): DonnaConversationMessage[];
+  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">): DonnaConversationMessage;
   getRunnerThread(projectId: string, runnerId: string): string | undefined;
   setRunnerThread(projectId: string, runnerId: string, threadId: string): void;
 }
@@ -22,6 +33,7 @@ export interface ProjectRuntimeRepository {
 export class MemoryProjectRuntime implements ProjectRuntimeRepository {
   #tickets = new Map<string, TicketRuntimeState>();
   #donnaThreads = new Map<string, string>();
+  #donnaMessages = new Map<string, DonnaConversationMessage[]>();
   #runnerThreads = new Map<string, string>();
 
   getTicket(projectId: string, ticketId: string): TicketRuntimeState {
@@ -40,6 +52,16 @@ export class MemoryProjectRuntime implements ProjectRuntimeRepository {
     this.#donnaThreads.set(projectId, threadId);
   }
 
+  getDonnaMessages(projectId: string): DonnaConversationMessage[] {
+    return structuredClone(this.#donnaMessages.get(projectId) ?? []);
+  }
+
+  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">): DonnaConversationMessage {
+    const stored = { ...message, id: randomUUID(), createdAt: new Date().toISOString() };
+    this.#donnaMessages.set(projectId, [...(this.#donnaMessages.get(projectId) ?? []), stored]);
+    return structuredClone(stored);
+  }
+
   getRunnerThread(projectId: string, runnerId: string): string | undefined {
     return this.#runnerThreads.get(key(projectId, runnerId));
   }
@@ -53,6 +75,7 @@ type RuntimeDocument = {
   version: 1;
   tickets: Record<string, TicketRuntimeState>;
   donnaThreads: Record<string, string>;
+  donnaMessages: Record<string, DonnaConversationMessage[]>;
   runnerThreads: Record<string, string>;
 };
 
@@ -83,6 +106,17 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
     this.#persist();
   }
 
+  getDonnaMessages(projectId: string): DonnaConversationMessage[] {
+    return structuredClone(this.#document.donnaMessages[projectId] ?? []);
+  }
+
+  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">): DonnaConversationMessage {
+    const stored = { ...message, id: randomUUID(), createdAt: new Date().toISOString() };
+    this.#document.donnaMessages[projectId] = [...(this.#document.donnaMessages[projectId] ?? []), stored].slice(-500);
+    this.#persist();
+    return structuredClone(stored);
+  }
+
   getRunnerThread(projectId: string, runnerId: string): string | undefined {
     return this.#document.runnerThreads[key(projectId, runnerId)];
   }
@@ -100,7 +134,7 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
   }
 
   #load(): RuntimeDocument {
-    if (!existsSync(this.filePath)) return { version: 1, tickets: {}, donnaThreads: {}, runnerThreads: {} };
+    if (!existsSync(this.filePath)) return { version: 1, tickets: {}, donnaThreads: {}, donnaMessages: {}, runnerThreads: {} };
     const parsed = JSON.parse(readFileSync(this.filePath, "utf8")) as Partial<RuntimeDocument>;
     if (parsed.version !== 1 || !parsed.tickets || typeof parsed.tickets !== "object") {
       throw new Error(`Invalid Codex Runners runtime document at ${this.filePath}`);
@@ -109,6 +143,7 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
       version: 1,
       tickets: parsed.tickets,
       donnaThreads: parsed.donnaThreads ?? {},
+      donnaMessages: parsed.donnaMessages ?? {},
       runnerThreads: parsed.runnerThreads ?? {}
     };
   }

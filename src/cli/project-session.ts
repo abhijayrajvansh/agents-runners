@@ -29,12 +29,17 @@ export async function runProjectSession(
   runtimeRoot: string,
   onStarted?: () => Promise<void>
 ): Promise<void> {
-  const release = await acquireProjectSession(config, url);
+  const session = await acquireProjectSession(config, url);
   try {
     await onStarted?.();
   } catch (error) {
-    await release();
+    await session.release();
     throw error;
+  }
+  if (!session.acquired) {
+    process.stdout.write(`Codex Runners · ${config.project.name}\n${url}\n`);
+    process.stdout.write(`Reopened the existing project session (PID ${session.existingPid}).\n`);
+    return;
   }
   const socketUrl = `ws://${config.server.host}:${config.server.port}/ws?projectId=${encodeURIComponent(config.project.id)}&since=0`;
   const socket = new WebSocket(socketUrl);
@@ -100,7 +105,7 @@ export async function runProjectSession(
     process.off("SIGINT", shutdown);
     process.off("SIGTERM", shutdown);
     socket.terminate();
-    await release();
+    await session.release();
   }
 }
 
@@ -126,7 +131,11 @@ export async function printProjectSessions(runtimeRoot: string): Promise<void> {
   }
 }
 
-async function acquireProjectSession(config: ProjectConfig, url: string): Promise<() => Promise<void>> {
+async function acquireProjectSession(config: ProjectConfig, url: string): Promise<{
+  acquired: boolean;
+  existingPid?: number;
+  release(): Promise<void>;
+}> {
   const runtimeDirectory = projectRuntimePath(config.project.repositoryRoot);
   const sessionPath = path.join(runtimeDirectory, "session.json");
   await mkdir(runtimeDirectory, { recursive: true, mode: 0o700 });
@@ -138,9 +147,7 @@ async function acquireProjectSession(config: ProjectConfig, url: string): Promis
     if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     const current = await readProjectSession(config.project.repositoryRoot);
     if (current && isProcessAlive(current.pid)) {
-      throw new ProjectSessionError(
-        `${config.project.name} already has an active Codex Runners session with PID ${current.pid}`
-      );
+      return { acquired: false, existingPid: current.pid, release: async () => undefined };
     }
     await rm(sessionPath, { force: true });
     handle = await open(sessionPath, "wx", 0o600);
@@ -155,10 +162,13 @@ async function acquireProjectSession(config: ProjectConfig, url: string): Promis
   await handle.writeFile(`${JSON.stringify(record, null, 2)}\n`);
   await handle.close();
   let released = false;
-  return async () => {
-    if (released) return;
-    released = true;
-    await rm(sessionPath, { force: true });
+  return {
+    acquired: true,
+    release: async () => {
+      if (released) return;
+      released = true;
+      await rm(sessionPath, { force: true });
+    }
   };
 }
 

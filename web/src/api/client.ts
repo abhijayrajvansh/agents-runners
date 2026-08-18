@@ -1,5 +1,6 @@
 import type { ProjectConfig, Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
+import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
 
 export class ApiError extends Error {
   readonly status: number;
@@ -45,6 +46,13 @@ export class RunnersApi {
       { method: "POST", body: JSON.stringify({ message, source: "browser" }) }
     );
     return response.message;
+  }
+
+  async getDonnaMessages(projectId: string): Promise<DonnaConversationMessage[]> {
+    const response = await this.#request<{ messages: DonnaConversationMessage[] }>(
+      `/api/projects/${encodeURIComponent(projectId)}/donna`
+    );
+    return response.messages;
   }
 
   async #request<T>(url: string, init: RequestInit = {}): Promise<T> {

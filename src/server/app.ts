@@ -105,6 +105,11 @@ export function createApp(dependencies: AppDependencies): Express {
     response.json({ message, events: donnaEvents });
   }));
 
+  app.get("/api/projects/:projectId/donna", asyncRoute(async (request, response) => {
+    if (!dependencies.donna) throw new Error("Donna is unavailable");
+    response.json({ messages: dependencies.donna.history(requiredParam(request.params.projectId)) });
+  }));
+
   app.post("/api/mcp/:toolName", asyncRoute(async (request, response) => {
     if (!dependencies.mcpTools) throw new Error("MCP tools are unavailable");
     const toolName = requiredParam(request.params.toolName);

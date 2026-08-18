@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ProjectConfig, Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
+import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
 import type { ProjectEvent } from "../../../src/server/event-bus.js";
 import { RunnersApi } from "../api/client.js";
 import { connectProjectSocket } from "../api/socket.js";
@@ -12,6 +13,7 @@ export type ProjectState = {
   project: ProjectConfig | null;
   runners: RunnerRecord[];
   activity: ProjectEvent[];
+  donnaMessages: DonnaConversationMessage[];
   connected: boolean;
   loading: boolean;
   error: string | null;
@@ -25,6 +27,7 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
   const [project, setProject] = useState<ProjectConfig | null>(null);
   const [runners, setRunners] = useState<RunnerRecord[]>([]);
   const [activity, setActivity] = useState<ProjectEvent[]>([]);
+  const [donnaMessages, setDonnaMessages] = useState<DonnaConversationMessage[]>([]);
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,12 +35,14 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
 
   const refresh = useCallback(async () => {
     try {
-      const [nextProject, nextRunners] = await Promise.all([
+      const [nextProject, nextRunners, nextDonnaMessages] = await Promise.all([
         api.getProject(projectId),
-        api.listRunners(projectId)
+        api.listRunners(projectId),
+        api.getDonnaMessages(projectId)
       ]);
       setProject(nextProject);
       setRunners(nextRunners);
+      setDonnaMessages(nextDonnaMessages);
       setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -52,10 +57,11 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
     sequence.current = Math.max(sequence.current, event.sequence);
     setActivity(current => [...current, event].slice(-80));
     if (event.type === "config.error" && typeof event.payload.message === "string") setError(event.payload.message);
+    if (event.type.startsWith("donna.")) void api.getDonnaMessages(projectId).then(setDonnaMessages);
     if (event.type.startsWith("ticket.") || event.type.startsWith("runner.") || event.type === "project.updated") {
       void refresh();
     }
-  }, setConnected), [projectId, refresh]);
+  }, setConnected), [api, projectId, refresh]);
 
   const moveTicket = useCallback(async (ticketId: string, status: TicketStatus, expectedRevision: number) => {
     const snapshot = project;
@@ -88,7 +94,20 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
     await refresh();
   }, [api, project, projectId, refresh]);
 
-  const messageDonna = useCallback((message: string) => api.messageDonna(projectId, message), [api, projectId]);
+  const messageDonna = useCallback(async (message: string) => {
+    setDonnaMessages(current => [...current, {
+      id: crypto.randomUUID(),
+      author: "user",
+      text: message,
+      source: "browser",
+      createdAt: new Date().toISOString()
+    }]);
+    try {
+      return await api.messageDonna(projectId, message);
+    } finally {
+      setDonnaMessages(await api.getDonnaMessages(projectId));
+    }
+  }, [api, projectId]);
 
-  return { project, runners, activity, connected, loading, error, refresh, moveTicket, saveTicket, messageDonna };
+  return { project, runners, activity, donnaMessages, connected, loading, error, refresh, moveTicket, saveTicket, messageDonna };
 }

@@ -4,7 +4,7 @@ import type { ProjectConfig } from "../domain/types.js";
 import { projectRuntimePath } from "../platform/paths.js";
 import type { CodexEvent, CodexService } from "../runners/codex-service.js";
 import type { TmuxService } from "../runners/tmux-service.js";
-import type { ProjectRuntimeRepository } from "../runtime/project-runtime.js";
+import type { DonnaConversationMessage, ProjectRuntimeRepository } from "../runtime/project-runtime.js";
 import type { EventBus } from "../server/event-bus.js";
 import type { ProjectRegistry } from "../server/project-registry.js";
 
@@ -36,6 +36,11 @@ export class DonnaService {
     return this.#send(projectId, message, source);
   }
 
+  history(projectId: string): DonnaConversationMessage[] {
+    const project = this.dependencies.registry.get(projectId);
+    return this.dependencies.runtimeFor(project).getDonnaMessages(projectId);
+  }
+
   async *#send(projectId: string, message: string, source: DonnaMessageSource): AsyncGenerator<DonnaEvent> {
     const previous = this.#turns.get(projectId) ?? Promise.resolve();
     await previous.catch(() => undefined);
@@ -62,6 +67,13 @@ export class DonnaService {
   ): Promise<void> {
     const project = this.dependencies.registry.get(projectId);
     const runtime = this.dependencies.runtimeFor(project);
+    const userMessage = runtime.appendDonnaMessage(projectId, { author: "user", text: message, source });
+    this.dependencies.events.publish({
+      type: "donna.user",
+      projectId,
+      revision: project.board.revision,
+      payload: { message: userMessage }
+    });
     const session = sessionName(projectId);
     const pane = await this.dependencies.tmux.ensurePane({
       session,
@@ -89,6 +101,7 @@ export class DonnaService {
     });
     if (result.exitCode !== 0) throw new Error(`Donna exited with code ${result.exitCode}: ${result.message}`);
     if (result.threadId) runtime.setDonnaThread(projectId, result.threadId);
+    if (result.message) runtime.appendDonnaMessage(projectId, { author: "donna", text: result.message, source });
     if (result.message && result.message !== lastMessage) {
       const messageEvent: DonnaEvent = { type: "message", projectId, text: result.message };
       emit(messageEvent);
