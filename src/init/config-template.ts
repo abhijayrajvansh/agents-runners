@@ -22,6 +22,7 @@ export function createProjectConfig(input: ConfigTemplateInput): ProjectConfig {
       integrationBranch: input.integrationBranch,
       remote: "origin"
     },
+    donna: { model: "gpt-5.6-luna", reasoningEffort: "low" },
     board: { revision: 0, tickets: [] },
     metadata: { createdAt: now, updatedAt: now }
   });

@@ -1,5 +1,7 @@
 import { FormEvent, useState } from "react";
 import { ArrowUp, PanelLeftClose, Sparkles } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
 
 export type DonnaRailProps = {
@@ -54,7 +56,9 @@ export function DonnaRail({ projectName, messages = [], onSend, onCollapse }: Do
         }]).map(item => (
           <div key={item.id} className={`donna-message donna-message--${item.author}`}>
             <span>{item.author === "donna" ? "Donna" : "You"}</span>
-            <p>{item.text}</p>
+            <div className="donna-markdown">
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown>
+            </div>
           </div>
         ))}
         {sending && <div className="typing-indicator" aria-label="Donna is thinking"><i /><i /><i /></div>}

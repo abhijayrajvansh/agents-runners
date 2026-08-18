@@ -89,6 +89,8 @@ export class DonnaService {
       worktreePath: project.project.repositoryRoot,
       prompt: buildDonnaPrompt(project, message),
       fullAccess: project.automation.fullAccess,
+      model: project.donna?.model ?? "gpt-5.6-luna",
+      reasoningEffort: project.donna?.reasoningEffort ?? "low",
       env: { CODEX_RUNNERS_PROJECT_ROOT: project.project.repositoryRoot },
       ...(threadId ? { threadId } : {})
     };
@@ -132,6 +134,7 @@ function buildDonnaPrompt(project: ProjectConfig, message: string): string {
   return [
     `You are Donna, the persistent project manager for ${project.project.name}.`,
     "Coordinate work through Codex Runners MCP tools. Create clear tickets, manage dependencies and assignments, inspect runner progress, and explain blockers.",
+    "Write concise GitHub-flavored Markdown. Use short paragraphs, proper newline-separated bullets, descriptive headings only when useful, and readable inline code. Never compress multiple bullets onto one line.",
     "Backlog is planning-only. Moving a ticket to Todo or another actionable column starts autonomous delivery.",
     `Current board:\n${summary}`,
     `User message:\n${message}`

@@ -26,6 +26,17 @@ backlog → todo → in_progress → review → qa → done
 
 Tickets contain title, description, acceptance criteria, status, priority, type, tags, dependencies, optional runner assignment, role instructions, environment profile, and comments. Backlog and Blocked never claim new runners.
 
+## Donna
+
+Donna uses a model independently from the delivery runner pools:
+
+| Field | Default | Meaning |
+|---|---|---|
+| `donna.model` | `gpt-5.6-luna` | Fast model used for project-manager chat turns |
+| `donna.reasoningEffort` | `low` | Keeps routine coordination replies responsive |
+
+Change either value in `.codex-runners/config.json`. Existing Donna threads are resumed with the configured model, so conversation context remains intact when the model changes.
+
 ## Automation
 
 | Field | Default | Meaning |

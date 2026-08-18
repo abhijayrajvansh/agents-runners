@@ -16,6 +16,8 @@ export type CodexTurnInput = {
   prompt: string;
   threadId?: string;
   fullAccess: boolean;
+  model?: string;
+  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
   env?: Record<string, string>;
 };
 
@@ -96,7 +98,13 @@ export function buildCodexArgs(input: {
   threadId?: string;
   fullAccess: boolean;
   worktreePath: string;
+  model?: string;
+  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
 }): string[] {
+  const modelOptions = [
+    ...(input.model ? ["--model", input.model] : []),
+    ...(input.reasoningEffort ? ["--config", `model_reasoning_effort=${JSON.stringify(input.reasoningEffort)}`] : [])
+  ];
   if (input.threadId) {
     return [
       "exec",
@@ -104,6 +112,7 @@ export function buildCodexArgs(input: {
       input.threadId,
       "-",
       "--json",
+      ...modelOptions,
       ...(input.fullAccess ? ["--dangerously-bypass-approvals-and-sandbox"] : [])
     ];
   }
@@ -111,6 +120,7 @@ export function buildCodexArgs(input: {
     "exec",
     "-",
     "--json",
+    ...modelOptions,
     ...(input.fullAccess ? ["--dangerously-bypass-approvals-and-sandbox"] : []),
     "-C",
     input.worktreePath

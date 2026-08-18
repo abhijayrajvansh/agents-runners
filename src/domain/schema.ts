@@ -63,6 +63,10 @@ export const ProjectConfigSchema = z.object({
     port: z.number().int().min(1024).max(65_535).default(4777),
     openBrowser: z.boolean().default(true)
   }).strict().default({ host: "127.0.0.1", port: 4777, openBrowser: true }),
+  donna: z.object({
+    model: z.string().min(1).default("gpt-5.6-luna"),
+    reasoningEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).default("low")
+  }).strict().optional(),
   board: z.object({
     revision: z.number().int().nonnegative(),
     columns: z.array(TicketStatusSchema).min(1).default([...defaultColumns]),
