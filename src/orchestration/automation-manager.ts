@@ -155,7 +155,7 @@ export class AutomationManager {
         role: id === "donna" ? "donna" as const : runner?.role ?? roleFromRunnerId(id),
         status: pane.pid === 0 ? "unhealthy" : runner?.status ?? "idle",
         ...(runner?.ticketId ? { ticketId: runner.ticketId } : {}),
-        command: pane.command,
+        command: id === "donna" ? pane.command : "codex",
         pid: pane.pid,
         output: stripTerminalControl(output).trimEnd(),
         attachCommand: `tmux attach -t ${target}`
