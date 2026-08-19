@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { WebSocket } from "ws";
 
 import type { ProjectConfig } from "../domain/types.js";
+import type { RunnerRecord } from "../orchestration/runner-pool.js";
 import { ProjectConfigSchema } from "../domain/schema.js";
 import { projectConfigPath, projectRuntimePath } from "../platform/paths.js";
 import { RuntimeStore } from "../runtime/runtime-store.js";
@@ -120,32 +121,103 @@ export async function runProjectSession(
   }
 }
 
-export async function printProjectSessions(runtimeRoot: string): Promise<void> {
+export type ProjectSessionListOptions = {
+  currentRoot?: string;
+  global?: boolean;
+  verbose?: boolean;
+};
+
+export async function printProjectSessions(
+  runtimeRoot: string,
+  options: ProjectSessionListOptions = {}
+): Promise<void> {
   const daemon = await readDaemonStatus(runtimeRoot);
   const roots = await new RuntimeStore(runtimeRoot).loadProjects();
+  const selectedRoots = selectProjectRoots(roots, options.currentRoot ?? process.cwd(), options.global ?? false);
   process.stdout.write(`${color.bold("Codex Runners")}\n\n`);
-  process.stdout.write(`${daemon.running ? color.green("● Running") : color.red("● Stopped")}  Daemon`);
-  if (daemon.running) process.stdout.write(`  ${color.dim(`PID ${daemon.pid} · ${daemon.host}:${daemon.port}`)}`);
-  process.stdout.write("\n");
+  process.stdout.write(`${daemon.running ? color.green("● Running") : color.red("● Stopped")}\n`);
   if (roots.length === 0) {
     process.stdout.write(`\n${color.dim("No registered projects.")}\n`);
     return;
   }
+  if (selectedRoots.length === 0) {
+    throw new ProjectSessionError("This directory is not a running Codex Runners project. Use `cr -g ls` to list every active project.");
+  }
 
-  process.stdout.write(`\n${color.bold("Projects")}\n`);
+  if (options.verbose) {
+    await printVerboseProjectSessions(selectedRoots, daemon);
+    return;
+  }
+
+  for (const root of selectedRoots) {
+    try {
+      const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(root), "utf8")));
+      const runners = daemon.running ? await fetchProjectRunners(config) : [];
+      process.stdout.write(`\n${formatProjectSessionSummary(config, runners)}\n`);
+    } catch {
+      continue;
+    }
+  }
+}
+
+export function selectProjectRoots(roots: string[], currentRoot: string, global: boolean): string[] {
+  if (global) return roots;
+  const current = path.resolve(currentRoot);
+  const matches = roots.filter(root => {
+    const relative = path.relative(path.resolve(root), current);
+    return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  });
+  return matches.sort((left, right) => right.length - left.length).slice(0, 1);
+}
+
+export function formatProjectSessionSummary(config: ProjectConfig, runners: RunnerRecord[]): string {
+  const tickets = new Map(config.board.tickets.map(ticket => [ticket.id, ticket.title]));
+  const active = runners.filter(runner => runner.status === "working" && runner.ticketId);
+  const lines = [
+    `${color.bold(config.project.name)} · ${config.project.integrationBranch}`,
+    `Board: ${color.cyan(`http://${config.server.host}:${config.server.port}/projects/${config.project.id}`)}`,
+    "",
+    `Active agents · ${active.length}`
+  ];
+  if (active.length === 0) {
+    lines.push(color.dim("No agents are working right now."));
+  } else {
+    for (const runner of active) {
+      lines.push(`${roleIcon(runner.role)} ${runner.id}  ${tickets.get(runner.ticketId!) ?? runner.ticketId}`);
+    }
+  }
+  return lines.join("\n");
+}
+
+async function fetchProjectRunners(config: ProjectConfig): Promise<RunnerRecord[]> {
+  try {
+    const response = await fetch(
+      `http://${config.server.host}:${config.server.port}/api/projects/${encodeURIComponent(config.project.id)}/runners`
+    );
+    if (!response.ok) return [];
+    const body = await response.json() as { runners?: RunnerRecord[] };
+    return body.runners ?? [];
+  } catch {
+    return [];
+  }
+}
+
+async function printVerboseProjectSessions(
+  roots: string[],
+  daemon: Awaited<ReturnType<typeof readDaemonStatus>>
+): Promise<void> {
+  process.stdout.write(`  Daemon`);
+  if (daemon.running) process.stdout.write(`  ${color.dim(`PID ${daemon.pid} · ${daemon.host}:${daemon.port}`)}`);
+  process.stdout.write(`\n\n${color.bold("Projects")}\n`);
   for (const root of roots) {
     try {
       const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(root), "utf8")));
       const session = await readProjectSession(root);
       const foreground = Boolean(session && isProcessAlive(session.pid));
-      const active = daemon.running;
       const url = `http://${config.server.host}:${config.server.port}/projects/${config.project.id}`;
-      process.stdout.write(`\n${active ? color.green("● Active") : color.red("● Inactive")}  ${color.bold(config.project.name)}`);
-      if (foreground && session) {
-        process.stdout.write(`  ${color.dim(`foreground PID ${session.pid}`)}`);
-      } else if (active) {
-        process.stdout.write(`  ${color.dim("background")}`);
-      }
+      process.stdout.write(`\n${daemon.running ? color.green("● Active") : color.red("● Inactive")}  ${color.bold(config.project.name)}`);
+      if (foreground && session) process.stdout.write(`  ${color.dim(`foreground PID ${session.pid}`)}`);
+      else if (daemon.running) process.stdout.write(`  ${color.dim("background")}`);
       process.stdout.write(`\n  Board   ${color.cyan(url)}\n  Repo    ${root}\n`);
       const tmux = await readTmuxSession(config.project.id);
       if (!tmux) {
@@ -161,6 +233,12 @@ export async function printProjectSessions(runtimeRoot: string): Promise<void> {
       continue;
     }
   }
+}
+
+function roleIcon(role: RunnerRecord["role"]): string {
+  if (role === "developer") return "💻";
+  if (role === "reviewer") return "🔍";
+  return "🧪";
 }
 
 export async function waitForProjectSessionEnd(projectRoot: string, timeoutMs = 5_000): Promise<void> {

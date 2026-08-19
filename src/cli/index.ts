@@ -29,6 +29,7 @@ export function createCli(): Command {
   const program = new Command()
     .name("codex-runners")
     .description("Local autonomous Kanban orchestration for Codex")
+    .option("-g, --global", "operate on every active project")
     .version("0.1.0");
 
   program.command("init")
@@ -148,9 +149,14 @@ export function createCli(): Command {
     });
 
   program.command("ls")
-    .description("List registered projects and active foreground sessions")
-    .action(async () => {
-      await printProjectSessions(userRuntimeRoot());
+    .description("List active agents for the current project")
+    .option("--verbose", "show daemon, tmux, process, and worktree diagnostics")
+    .action(async options => {
+      await printProjectSessions(userRuntimeRoot(), {
+        currentRoot: process.cwd(),
+        global: Boolean(program.opts().global),
+        verbose: Boolean(options.verbose)
+      });
     });
 
   program.command("open")
