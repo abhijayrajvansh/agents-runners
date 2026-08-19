@@ -18,13 +18,14 @@ export type SessionStartDependencies = {
 
 export async function handleSessionStart(
   input: SessionStartInput,
-  dependencies: SessionStartDependencies
+  dependencies: SessionStartDependencies,
+  options: { skipBrowser?: boolean } = {}
 ): Promise<{ additionalContext?: string }> {
   const root = await findInitializedProject(input.cwd);
   if (!root) return {};
   const config = await new AtomicJsonStore(projectConfigPath(root), ProjectConfigSchema).load();
   const daemon = await dependencies.ensureDaemon(root);
-  if (config.server.openBrowser) await dependencies.openBrowser(daemon.url);
+  if (config.server.openBrowser && !options.skipBrowser) await dependencies.openBrowser(daemon.url);
 
   return {
     additionalContext: [

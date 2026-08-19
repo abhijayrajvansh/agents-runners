@@ -13,6 +13,7 @@ import { Command } from "commander";
 import { ProjectConfigSchema } from "../domain/schema.js";
 import { runDonnaClient } from "./donna-client.js";
 import { publicProjectUrl, readDaemonStatus, stopDaemon } from "./daemon-client.js";
+import { launchInteractiveCodex } from "./interactive-codex.js";
 import { printProjectSessions, ProjectSessionError, waitForProjectSessionEnd } from "./project-session.js";
 import { runDoctor } from "../doctor/doctor.js";
 import { handleSessionStart } from "../hooks/session-start.js";
@@ -75,7 +76,7 @@ export function createCli(): Command {
       openBrowser: async url => {
         await exec("open", [url]);
       }
-    });
+    }, { skipBrowser: process.env.CODEX_RUNNERS_BOARD_OPENED === "1" });
     process.stdout.write(JSON.stringify(output));
   });
 
@@ -100,7 +101,7 @@ export function createCli(): Command {
     });
 
   program.command("start")
-    .description("Start the current project in the background and open its board")
+    .description("Start the current project and enter an interactive Codex session")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
       const config = await loadOrInitializeProject(options.root);
@@ -109,6 +110,8 @@ export function createCli(): Command {
       process.stdout.write("Codex Runners started in the background.\n");
       await printProjectLinks(config, result.url);
       await printResumedAssignments(config);
+      process.stdout.write("\nOpening Codex…\n");
+      await launchInteractiveCodex(config.project.repositoryRoot);
     });
 
   program.command("stop")

@@ -100,4 +100,20 @@ describe("handleSessionStart", () => {
     expect(output).toEqual({});
     expect(ensureDaemon).not.toHaveBeenCalled();
   });
+
+  it("does not reopen the board when the launching command already opened it", async () => {
+    const root = await createRepository();
+    await initializeProject(root, {
+      pluginRoot: "/Users/example/plugins/codex-runners",
+      nodePath: "/usr/bin/node"
+    });
+    const openBrowser = vi.fn();
+
+    await handleSessionStart({ cwd: root, source: "startup" }, {
+      ensureDaemon: vi.fn().mockResolvedValue({ url: "http://127.0.0.1:4777/projects/demo" }),
+      openBrowser
+    }, { skipBrowser: true });
+
+    expect(openBrowser).not.toHaveBeenCalled();
+  });
 });
