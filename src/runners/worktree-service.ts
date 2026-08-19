@@ -64,13 +64,21 @@ export class WorktreeService {
   }
 
   async removeDeliveryBranch(config: ProjectConfig, branch: string): Promise<void> {
-    await this.commands.run("git", ["branch", "-D", branch], { cwd: config.project.repositoryRoot }).catch(error => {
-      if (!(error instanceof CommandError)) throw error;
-    });
+    if (await this.#branchExists(config.project.repositoryRoot, branch)) {
+      await this.commands.run("git", ["branch", "-D", branch], { cwd: config.project.repositoryRoot });
+    }
     if (await this.hasRemote(config)) {
-      await this.commands.run("git", ["push", config.project.remote, "--delete", branch], { cwd: config.project.repositoryRoot }).catch(error => {
-        if (!(error instanceof CommandError)) throw error;
+      const remoteBranchExists = await this.commands.run(
+        "git",
+        ["ls-remote", "--exit-code", "--heads", config.project.remote, branch],
+        { cwd: config.project.repositoryRoot }
+      ).then(() => true, error => {
+        if (error instanceof CommandError && error.exitCode === 2) return false;
+        throw error;
       });
+      if (remoteBranchExists) {
+        await this.commands.run("git", ["push", config.project.remote, "--delete", branch], { cwd: config.project.repositoryRoot });
+      }
     }
   }
 
