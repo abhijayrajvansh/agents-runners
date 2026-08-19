@@ -34,13 +34,16 @@ export function createMcpServer(callTool: McpToolCaller): McpServer {
 export async function runStdioMcpServer(
   projectRoot = process.env.CODEX_RUNNERS_PROJECT_ROOT ?? process.cwd()
 ): Promise<void> {
-  const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(projectRoot), "utf8")));
-  const baseUrl = `http://${config.server.host}:${config.server.port}`;
   const server = createMcpServer(async (name, input) => {
+    const requestedRoot = typeof input.projectRoot === "string" && input.projectRoot.trim().length > 0
+      ? input.projectRoot
+      : projectRoot;
+    const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(requestedRoot), "utf8")));
+    const baseUrl = `http://${config.server.host}:${config.server.port}`;
     const response = await fetch(`${baseUrl}/api/mcp/${name}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ ...input, projectRoot: input.projectRoot ?? projectRoot })
+      body: JSON.stringify({ ...input, projectRoot: requestedRoot })
     });
     const body = await response.json() as { error?: { message?: string } };
     if (!response.ok) throw new Error(body.error?.message ?? `Codex Runners MCP request failed with ${response.status}`);

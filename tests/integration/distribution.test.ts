@@ -38,7 +38,8 @@ describe("plugin distribution", () => {
     });
     expect(mcp.mcpServers).toHaveProperty("codex-runners");
     expect(packageJson.bin).toEqual({
-      "codex-runners": "dist/bin/cli.mjs"
+      "codex-runners": "dist/bin/cli.mjs",
+      "cr": "dist/bin/cli.mjs"
     });
     expect(skill).toMatch(/^---\nname: codex-runners\ndescription: Use when /);
     expect(agent).toContain('default_prompt: "Use $codex-runners');
@@ -75,6 +76,25 @@ describe("plugin distribution", () => {
     } finally {
       await client.close();
       await initialized.cleanup();
+    }
+  });
+
+  it("handshakes when Codex launches it from the plugin directory", async () => {
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [path.join(root, "dist/bin/mcp.mjs")],
+      cwd: root,
+      env: getDefaultEnvironment(),
+      stderr: "pipe"
+    });
+    const client = new Client({ name: "codex-session-test", version: "1.0.0" });
+
+    try {
+      await client.connect(transport);
+      const tools = await client.listTools();
+      expect(tools.tools.map(tool => tool.name)).toEqual([...MCP_TOOL_NAMES]);
+    } finally {
+      await client.close();
     }
   });
 });
