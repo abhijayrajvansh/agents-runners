@@ -10,12 +10,13 @@ export function buildStagePrompt(
 ): string {
   const roleInstructions = {
     developer: [
-      "Implement or repair the ticket in this persistent worktree.",
+      "Implement this vertical-slice ticket in the persistent worktree.",
+      "Use the bundled /tdd and /code-review skills: write a failing test at the agreed seam, make it pass, and review the diff before committing.",
       "Run the relevant verification, commit every completed change on this runner branch, include .codex-runners/config.json if it is modified, push the runner branch, and leave the worktree clean.",
       "Do not merge or push the integration branch."
     ],
     reviewer: [
-      "Review the developer branch against the ticket and acceptance criteria.",
+      "Review the developer branch against the originating spec and acceptance criteria using the bundled /code-review approach.",
       "Do not edit code. Return failed with precise findings when changes are required."
     ],
     qa: [

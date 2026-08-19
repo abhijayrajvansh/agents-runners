@@ -139,8 +139,8 @@ export function createApp(dependencies: AppDependencies): Express {
     const projectId = requiredParam(request.params.projectId);
     const ticketId = requiredParam(request.params.ticketId);
     const current = dependencies.registry.getBoard(projectId).tickets.find(ticket => ticket.id === ticketId);
-    if (current && !["backlog", "blocked", "done"].includes(current.status)) {
-      response.status(423).json({ error: { code: "TICKET_LOCKED", message: "Active tickets are read-only. Abort the ticket before editing it." } });
+    if (current && ["todo", "in_progress", "review", "qa"].includes(current.status)) {
+      response.status(423).json({ error: { code: "TICKET_LOCKED", message: "Active issues are read-only. Abort the issue before editing it." } });
       return;
     }
     const result = await dependencies.registry.updateTicket(

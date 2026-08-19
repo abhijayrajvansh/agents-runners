@@ -45,8 +45,8 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
   const blockerQuestion = ticket?.blocker?.question ?? blockerPrompt.question;
   const recommendedAction = ticket?.blocker?.recommendedAction ?? blockerPrompt.example;
   const autoResumeAt = ticket?.blocker?.autoResumeAt;
-  const editable = !ticket || ["backlog", "blocked", "done"].includes(ticket.status);
-  const abortable = Boolean(ticket && ["todo", "in_progress", "review", "qa"].includes(ticket.status));
+  const editable = !ticket || ["backlog", "needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix", "blocked", "done"].includes(ticket.status);
+  const abortable = Boolean(ticket && ["ready_for_agent", "todo", "in_progress", "review", "qa"].includes(ticket.status));
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!editable || !title.trim() || saving) return;
@@ -58,7 +58,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
         ...(ticket ? { id: ticket.id } : {}),
         title: title.trim(),
         description: description.trim(),
-        status: resume ? "todo" : status,
+        status: resume ? "ready_for_agent" : status,
         priority,
         acceptanceCriteria: acceptance.split("\n").map(value => value.trim()).filter(Boolean),
         ...(resume ? {
@@ -97,7 +97,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
           <label>Title<input autoFocus={editable} value={title} onChange={event => setTitle(event.target.value)} placeholder="What needs to be delivered?" /></label>
           <label>Description<textarea value={description} onChange={event => setDescription(event.target.value)} rows={5} placeholder="Give Donna and the runners useful context." /></label>
           <div className="form-row">
-            <label>Status<select value={status} onChange={event => setStatus(event.target.value as TicketStatus)}><option value="backlog">Backlog</option><option value="todo">Todo — start automatically</option><option value="in_progress">In progress</option><option value="review">Review</option><option value="qa">QA</option><option value="blocked">Blocked</option><option value="done">Done</option></select></label>
+            <label>Status<select value={status} onChange={event => setStatus(event.target.value as TicketStatus)}><option value="backlog">Backlog</option><option value="needs_triage">Needs triage</option><option value="needs_info">Needs info</option><option value="ready_for_agent">Ready for agent</option><option value="ready_for_human">Ready for human</option><option value="wontfix">Won’t fix</option><option value="todo">Todo — start automatically</option><option value="in_progress">In progress</option><option value="review">Review</option><option value="qa">QA</option><option value="blocked">Blocked</option><option value="done">Done</option></select></label>
             <label>Priority<select value={priority} onChange={event => setPriority(event.target.value as Ticket["priority"])}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label>
           </div>
           <label>Assign runner<select value={assignedRunnerId} onChange={event => setAssignedRunnerId(event.target.value)}><option value="">Automatic assignment</option>{runners.filter(runner => runner.role === "developer").map(runner => <option key={runner.id} value={runner.id}>{runner.id}</option>)}</select></label>

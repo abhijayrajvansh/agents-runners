@@ -47,11 +47,6 @@ export function Board({ project, runners, onMove, onOpenTicket, compactCards = f
     void onMove(ticket.id, status as TicketStatus, project.board.revision);
   };
   const columns = project.board.columns.reduce<Array<{ status: TicketStatus; label?: string; tickets: Ticket[] }>>((result, status) => {
-    if (status === "qa") return result;
-    if (status === "review") {
-      result.push({ status, label: "Review & QA", tickets: project.board.tickets.filter(ticket => ticket.status === "review" || ticket.status === "qa") });
-      return result;
-    }
     result.push({ status, tickets: project.board.tickets.filter(ticket => ticket.status === status) });
     return result;
   }, []);
@@ -89,11 +84,11 @@ export function Board({ project, runners, onMove, onOpenTicket, compactCards = f
 }
 
 function isHumanMovable(status: TicketStatus): boolean {
-  return status === "backlog" || status === "blocked";
+  return ["backlog", "needs_triage", "needs_info", "ready_for_human", "wontfix", "blocked"].includes(status);
 }
 
 function isManualDropTarget(status: TicketStatus): boolean {
-  return status === "backlog" || status === "todo" || status === "blocked";
+  return ["backlog", "needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix", "blocked"].includes(status);
 }
 
 const magneticCollisionDetection: CollisionDetection = arguments_ => {
@@ -106,7 +101,7 @@ function TicketDragPreview({ ticket }: { ticket: Ticket }) {
     <div className="ticket-drag-preview">
       <span>{ticket.id}</span>
       <strong>{ticket.title}</strong>
-      <small>Move to Backlog, Todo, or Blocked</small>
+      <small>Move through triage or to Ready for agent</small>
     </div>
   );
 }

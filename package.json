@@ -1,7 +1,7 @@
 {
   "name": "codex-runners",
   "version": "0.1.0",
-  "description": "Local autonomous Kanban orchestration for persistent Codex runners",
+  "description": "Local skill-driven orchestration for persistent Codex runners",
   "type": "module",
   "private": true,
   "engines": {

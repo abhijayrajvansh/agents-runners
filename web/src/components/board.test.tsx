@@ -14,8 +14,8 @@ describe("Board", () => {
     const onMove = vi.fn().mockResolvedValue(undefined);
     render(<Board project={projectFixture()} runners={[]} onMove={onMove} onOpenTicket={vi.fn()} />);
 
-    expect(screen.getAllByRole("region")).toHaveLength(6);
-    expect(screen.getByRole("region", { name: "Review & QA" })).toBeInTheDocument();
+    expect(screen.getAllByRole("region")).toHaveLength(8);
+    expect(screen.getByRole("region", { name: "Ready for agent" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Backlog" })).toHaveTextContent("Build authentication");
     fireEvent.click(screen.getByRole("button", { name: "Move Build authentication to Todo" }));
 
@@ -34,10 +34,11 @@ describe("Board", () => {
     render(<Board project={projectFixture()} runners={[]} onMove={vi.fn()} onOpenTicket={vi.fn()} />);
 
     expect(screen.getByRole("region", { name: "Backlog" })).toHaveAttribute("data-manual-drop-target", "true");
-    expect(screen.getByRole("region", { name: "Todo" })).toHaveAttribute("data-manual-drop-target", "true");
+    expect(screen.getByRole("region", { name: "Needs triage" })).toHaveAttribute("data-manual-drop-target", "true");
+    expect(screen.getByRole("region", { name: "Ready for agent" })).toHaveAttribute("data-manual-drop-target", "true");
     expect(screen.getByRole("region", { name: "Blocked" })).toHaveAttribute("data-manual-drop-target", "true");
     expect(screen.getByRole("region", { name: "In progress" })).not.toHaveAttribute("data-manual-drop-target");
-    expect(screen.getByRole("region", { name: "Review & QA" })).not.toHaveAttribute("data-manual-drop-target");
+    expect(screen.getByRole("region", { name: "Review" })).not.toHaveAttribute("data-manual-drop-target");
   });
 
   it("reveals destination hints when a ticket drag starts", async () => {

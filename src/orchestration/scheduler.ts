@@ -102,7 +102,7 @@ export class Scheduler {
       const prepared: Array<{ ticket: Ticket; runner: RunnerRecord; pool: RunnerPool }> = [];
       for (const assignment of assignments) {
         let ticket = assignment.ticket;
-        if (ticket.status === "todo") {
+        if (ticket.status === "todo" || ticket.status === "ready_for_agent") {
           const currentBoard = this.dependencies.registry.getBoard(projectId);
           const moved = await this.dependencies.registry.updateTicket(
             projectId,
@@ -356,7 +356,7 @@ function completedTicketIds(project: ProjectConfig, runtime: ProjectRuntimeRepos
 }
 
 function roleForStatus(status: TicketStatus): RoleName | null {
-  if (status === "todo" || status === "in_progress") return "developer";
+  if (status === "todo" || status === "ready_for_agent" || status === "in_progress") return "developer";
   if (status === "review") return "reviewer";
   if (status === "qa") return "qa";
   return null;

@@ -17,14 +17,14 @@ Each initialized repository owns `.codex-runners/config.json`. The daemon is its
 
 ## Board
 
-`board.revision` provides optimistic concurrency. Every REST or MCP write includes the latest expected revision. The default column order is:
+`board.revision` provides optimistic concurrency. Every REST or MCP write includes the latest expected revision. The default column order mixes triage and delivery:
 
 ```text
-backlog → todo → in_progress → review → qa → done
-                                  ↘ blocked
+backlog / needs_triage → ready_for_agent → in_progress → review → qa → done
+                                                              ↘ blocked
 ```
 
-Tickets contain title, description, acceptance criteria, status, priority, type, tags, dependencies, optional runner assignment, role instructions, environment profile, and comments. Backlog and Blocked never claim new runners.
+`backlog`, `needs_triage`, `needs_info`, `ready_for_human`, and `wontfix` are inert. `ready_for_agent` is actionable and is the entry point autonomous runners claim. Tickets also carry `kind` (`issue`, `spec`, `ticket`, `decision`, `map`), `source` (`manual`, `triage`, `to_spec`, `to_tickets`, `wayfinder`, `donna`), an optional triage category and triage state, plus title, description, acceptance criteria, status, priority, type, tags, dependencies, optional runner assignment, role instructions, environment profile, and comments. Planning and triage statuses never claim new runners.
 
 ## Donna
 
@@ -49,15 +49,15 @@ Donna's browser messages, persistent Codex thread ID, and recent conversation ar
 | `automation.humanInputTimeoutMinutes` | `10` | Minutes before a safe recommended blocker decision is applied automatically |
 | `automation.autoMerge` | `false` | Legacy compatibility field; final merges always require the Done-card button |
 | `automation.autoPush` | `true` | Push ticket delivery branches and user-approved integration results |
-| `automation.actionableStatuses` | Todo, In Progress, Review, QA | States that wake runners |
+| `automation.actionableStatuses` | Ready for agent, Todo, In Progress, Review, QA | States that wake runners |
 
 Set `automation.enabled` to `false` to keep the board readable without starting jobs. Changing `fullAccess` affects future turns only.
 
-Development, review, QA, and repair loops run automatically. A QA-passed ticket is sealed to its own delivery branch and moved to Done. Only the **Merge to `<integrationBranch>`** button integrates it; after a successful verified merge, Codex Runners deletes that ticket delivery branch locally and remotely. Dependent tickets wait until the prerequisite is merged, not merely QA-passed.
+Development, review, verification, and repair loops run automatically. A verification-passed issue is sealed to its own delivery branch and moved to Done. Only the **Merge to `<integrationBranch>`** button integrates it; after a successful verified merge, Codex Runners deletes that delivery branch locally and remotely. Dependent tickets wait until the prerequisite is merged, not merely verified.
 
-Ticket details are editable only in Backlog, Blocked, and Done. Todo, In Progress, Review, and QA tickets are read-only while agents own them. Their drawer exposes an emergency **Abort process** button that interrupts and unassigns active runners, clears the explicit assignment, and moves the ticket to Blocked for human instructions.
+Issue details are editable in planning/triage statuses (`backlog`, `needs_triage`, `needs_info`, `ready_for_human`, `wontfix`) plus Blocked and Done. `ready_for_agent`, Todo, In Progress, Review, and QA are read-only while agents own them. Their drawer exposes an emergency **Abort process** button that interrupts and unassigns active runners, clears the explicit assignment, and moves the issue to Blocked for human instructions.
 
-When a runner genuinely needs a decision, it must record the exact question and a safe recommended answer. The Blocked drawer shows both and the response deadline. If nobody answers before `automation.humanInputTimeoutMinutes`, the heartbeat records the recommendation as decision input, moves the ticket back to Todo, and resumes delivery. Emergency user-aborted tickets never auto-resume.
+When a runner genuinely needs a decision, it must record the exact question and a safe recommended answer. The Blocked drawer shows both and the response deadline. If nobody answers before `automation.humanInputTimeoutMinutes`, the heartbeat records the recommendation as decision input, moves the issue back to `ready_for_agent`, and resumes delivery. Emergency user-aborted issues never auto-resume.
 
 ## Runner pools
 

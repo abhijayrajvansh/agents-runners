@@ -1,17 +1,17 @@
 {
   "name": "codex-runners",
   "version": "0.1.0+codex.20260819090008",
-  "description": "Run a local realtime Kanban board with Donna and persistent autonomous Codex development, review, and QA pools.",
+  "description": "Run a local realtime skill-flow board with Donna and persistent autonomous Codex runners, using Matt Pocock's composable engineering skills.",
   "author": {
     "name": "Abhijay Rajvansh"
   },
   "license": "MIT",
   "keywords": [
     "codex",
-    "kanban",
+    "skill-flow",
     "agents",
     "automation",
-    "project-management",
+    "workflow",
     "tmux",
     "worktrees"
   ],
@@ -19,8 +19,8 @@
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Codex Runners",
-    "shortDescription": "Donna and autonomous Codex runner boards",
-    "longDescription": "Operate a white local Kanban workspace where Donna coordinates persistent Codex developers, reviewers, and QA runners from ticket creation through verified delivery.",
+    "shortDescription": "Donna and the skill-driven Codex runner board",
+    "longDescription": "Operate a local issue board where Donna coordinates persistent Codex runners through the bundled Matt Pocock flow: grill-with-docs, to-spec, to-tickets, implement, and code-review, from triage through verified delivery.",
     "developerName": "Abhijay Rajvansh",
     "category": "Productivity",
     "capabilities": [
@@ -28,8 +28,8 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Open this project's Codex Runners board.",
-      "Ask Donna to coordinate the next ticket."
+      "Open this project's Codex Runners skill-flow board.",
+      "Ask Donna to route the next issue or cut it into tickets with /to-tickets."
     ]
   }
 }

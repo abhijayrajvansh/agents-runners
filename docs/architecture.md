@@ -1,6 +1,6 @@
 # Architecture
 
-Codex Runners uses one loopback Node.js daemon for every initialized local project.
+Codex Runners uses one loopback Node.js daemon for every initialized local project. Work is modelled as skill-flow issues: planning and triage produce fully-specified `ready_for_agent` issues (or wayfinder decision tickets for un-specable efforts), and the delivery engine below implements them one vertical slice at a time with persistent Codex runners.
 
 ```text
 Codex CLI / Browser / Terminal

@@ -8,15 +8,23 @@ import type { TicketDeliveryState } from "../../../src/runtime/project-runtime.j
 
 const nextStatus: Partial<Record<TicketStatus, TicketStatus>> = {
   backlog: "todo",
+  needs_triage: "ready_for_agent",
+  needs_info: "needs_triage",
   todo: "in_progress",
   in_progress: "review",
   review: "qa",
   qa: "done",
-  blocked: "todo"
+  blocked: "ready_for_agent",
+  ready_for_human: "ready_for_agent"
 };
 
 const statusLabels: Record<TicketStatus, string> = {
   backlog: "Backlog",
+  needs_triage: "Needs triage",
+  needs_info: "Needs info",
+  ready_for_agent: "Ready for agent",
+  ready_for_human: "Ready for human",
+  wontfix: "Won't fix",
   todo: "Todo",
   in_progress: "In progress",
   review: "Review",
@@ -39,7 +47,7 @@ export type TicketCardProps = {
 };
 
 export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, blockerKind, delivery, onMerge, mergeBranch }: TicketCardProps) {
-  const humanMovable = ticket.status === "backlog" || ticket.status === "blocked";
+  const humanMovable = ["backlog", "needs_triage", "needs_info", "ready_for_human", "wontfix", "blocked"].includes(ticket.status);
   const draggable = useDraggable({ id: ticket.id, data: { ticket }, disabled: !humanMovable });
   const upcoming = humanMovable ? nextStatus[ticket.status] : undefined;
   const style = {

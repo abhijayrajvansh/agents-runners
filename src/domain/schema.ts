@@ -2,6 +2,11 @@ import { z } from "zod";
 
 export const TicketStatusSchema = z.enum([
   "backlog",
+  "needs_triage",
+  "needs_info",
+  "ready_for_agent",
+  "ready_for_human",
+  "wontfix",
   "todo",
   "in_progress",
   "review",
@@ -11,6 +16,25 @@ export const TicketStatusSchema = z.enum([
 ]);
 
 export const RoleNameSchema = z.enum(["developer", "reviewer", "qa"]);
+
+// An issue is the skill-flow unit of work. It carries an optional triage
+// dimension plus a kind that records how it entered the board.
+export const TicketKindSchema = z.enum([
+  "issue",
+  "spec",
+  "ticket",
+  "decision",
+  "map"
+]);
+
+export const TicketSourceSchema = z.enum([
+  "manual",
+  "triage",
+  "to_spec",
+  "to_tickets",
+  "wayfinder",
+  "donna"
+]);
 
 export const TicketCommentSchema = z.object({
   id: z.string().min(1),
@@ -30,6 +54,10 @@ export const TicketBlockerSchema = z.object({
 export const TicketSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
+  kind: TicketKindSchema.default("ticket"),
+  source: TicketSourceSchema.default("manual"),
+  category: z.enum(["bug", "enhancement"]).optional(),
+  triageState: z.enum(["needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix"]).optional(),
   description: z.string().default(""),
   acceptanceCriteria: z.array(z.string()).default([]),
   status: TicketStatusSchema,
@@ -55,8 +83,10 @@ const RolePoolSchema = z.object({
   instructions: z.string().default("")
 }).strict();
 
-const defaultColumns = ["backlog", "todo", "in_progress", "review", "qa", "blocked", "done"] as const;
-const actionableStatuses = ["todo", "in_progress", "review", "qa"] as const;
+const defaultColumns = ["backlog", "needs_triage", "ready_for_agent", "in_progress", "review", "qa", "blocked", "done"] as const;
+// Skill-flow work reaches the runner as `ready_for_agent` (from /triage or
+// /to-tickets) and then moves through the delivery statuses.
+const actionableStatuses = ["ready_for_agent", "todo", "in_progress", "review", "qa"] as const;
 
 export const ProjectConfigSchema = z.object({
   version: z.literal(1),
@@ -150,3 +180,5 @@ export type TicketStatus = z.infer<typeof TicketStatusSchema>;
 export type RoleName = z.infer<typeof RoleNameSchema>;
 export type Ticket = z.infer<typeof TicketSchema>;
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
+export type TicketKind = z.infer<typeof TicketKindSchema>;
+export type TicketSource = z.infer<typeof TicketSourceSchema>;

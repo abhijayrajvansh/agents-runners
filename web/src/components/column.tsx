@@ -7,6 +7,11 @@ import { TicketCard } from "./ticket-card.js";
 
 const labels: Record<TicketStatus, string> = {
   backlog: "Backlog",
+  needs_triage: "Needs triage",
+  needs_info: "Needs info",
+  ready_for_agent: "Ready for agent",
+  ready_for_human: "Ready for human",
+  wontfix: "Won't fix",
   todo: "Todo",
   in_progress: "In progress",
   review: "Review",

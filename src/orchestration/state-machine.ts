@@ -8,11 +8,16 @@ export type StageOutcome = {
 
 const allowedTransitions: Record<TicketStatus, TicketStatus[]> = {
   backlog: ["todo"],
-  todo: ["backlog", "in_progress", "blocked"],
+  needs_triage: ["needs_info", "ready_for_agent", "ready_for_human", "wontfix", "backlog"],
+  needs_info: ["needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix"],
+  ready_for_agent: ["backlog", "in_progress", "blocked"],
+  ready_for_human: ["backlog", "ready_for_agent", "blocked"],
+  wontfix: [],
+  todo: ["backlog", "in_progress", "blocked", "ready_for_agent"],
   in_progress: ["backlog", "review", "blocked"],
   review: ["backlog", "in_progress", "qa", "blocked"],
   qa: ["backlog", "in_progress", "done", "blocked"],
-  blocked: ["backlog", "todo"],
+  blocked: ["backlog", "todo", "ready_for_agent"],
   done: []
 };
 
@@ -21,7 +26,7 @@ export function nextStage(status: TicketStatus, outcome: StageOutcome): TicketSt
   if (outcome.kind === "failed") {
     return outcome.attempts >= outcome.maxRetries ? "blocked" : "in_progress";
   }
-  if (outcome.kind === "claimed" && status === "todo") return "in_progress";
+  if (outcome.kind === "claimed" && (status === "todo" || status === "ready_for_agent")) return "in_progress";
   if (outcome.kind === "passed") {
     if (status === "in_progress") return "review";
     if (status === "review") return "qa";

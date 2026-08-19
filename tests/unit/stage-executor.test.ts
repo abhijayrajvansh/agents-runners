@@ -60,6 +60,8 @@ function execution(): StageExecution {
   const ticket: Ticket = {
     id: "auth",
     title: "Build authentication",
+    kind: "ticket",
+    source: "to_tickets",
     description: "Add login",
     acceptanceCriteria: ["Users can log in"],
     status: "in_progress",

@@ -61,20 +61,20 @@ function objectResult(value: unknown): Record<string, unknown> {
 function descriptionFor(name: McpToolName): string {
   return ({
     get_project: "Read the complete initialized Codex Runners project configuration.",
-    get_board: "Read the current Kanban revision, columns, and tickets.",
-    get_ticket: "Read one ticket by ID.",
-    create_ticket: "Create a revision-protected ticket.",
-    update_ticket: "Update ticket fields using the expected board revision.",
-    move_ticket: "Move a ticket to a Kanban status; actionable statuses start automation.",
-    assign_ticket: "Assign a ticket to a persistent runner ID.",
-    claim_next_ticket: "Claim the next dependency-ready development ticket.",
-    add_ticket_comment: "Append a visible comment to a ticket.",
+    get_board: "Read the current skill-flow board revision, columns, and issues.",
+    get_ticket: "Read one issue by ID.",
+    create_ticket: "Create a revision-protected issue (spec, ticket, or decision).",
+    update_ticket: "Update issue fields using the expected board revision.",
+    move_ticket: "Move an issue through triage or delivery statuses; ready-for-agent starts automation.",
+    assign_ticket: "Assign an issue to a persistent runner ID.",
+    claim_next_ticket: "Claim the next dependency-ready ready-for-agent issue.",
+    add_ticket_comment: "Append a visible comment to an issue.",
     report_progress: "Publish a redacted live progress event for a ticket.",
-    complete_stage: "Report a structured development, review, or QA stage result.",
+    complete_stage: "Report a structured implement, review, or verify stage result.",
     list_runners: "List provisioned persistent Developer, Reviewer, and QA runners.",
     get_runner: "Inspect a persistent runner by ID.",
     message_donna: "Send a message to the project's canonical Donna thread.",
-    get_activity: "Read recent project, ticket, Donna, and runner events."
+    get_activity: "Read recent project, issue, Donna, and runner events."
   })[name];
 }
 

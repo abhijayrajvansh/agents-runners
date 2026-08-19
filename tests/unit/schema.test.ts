@@ -19,7 +19,7 @@ describe("ProjectConfigSchema", () => {
     expect(parsed.pools.reviewer.max).toBe(5);
     expect(parsed.pools.qa.max).toBe(5);
     expect(parsed.automation.maxRetries).toBe(3);
-    expect(parsed.automation.actionableStatuses).toEqual(["todo", "in_progress", "review", "qa"]);
+    expect(parsed.automation.actionableStatuses).toEqual(["ready_for_agent", "todo", "in_progress", "review", "qa"]);
   });
 
   it("rejects a ticket status outside the configured workflow", () => {

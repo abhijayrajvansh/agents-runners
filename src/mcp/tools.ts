@@ -121,7 +121,7 @@ export class McpTools {
     assertRevision(board.revision, revisionInput(input));
     const done = new Set(board.tickets.filter(ticket => ticket.status === "done").map(ticket => ticket.id));
     const ticket = board.tickets.find(candidate => (
-      ["todo", "in_progress"].includes(candidate.status) &&
+      ["ready_for_agent", "todo", "in_progress"].includes(candidate.status) &&
       !candidate.assignedRunnerId &&
       candidate.dependencies.every(dependency => done.has(dependency))
     ));
@@ -181,7 +181,7 @@ function revisionInput(input: Record<string, unknown>): number {
 
 function statusInput(input: Record<string, unknown>): TicketStatus {
   const status = stringInput(input, "status");
-  if (!["backlog", "todo", "in_progress", "review", "qa", "blocked", "done"].includes(status)) {
+  if (!["backlog", "needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix", "todo", "in_progress", "review", "qa", "blocked", "done"].includes(status)) {
     throw new Error(`Unknown ticket status ${status}`);
   }
   return status as TicketStatus;

@@ -31,8 +31,8 @@ describe("plugin distribution", () => {
         displayName: "Codex Runners",
         category: "Productivity",
         defaultPrompt: [
-          "Open this project's Codex Runners board.",
-          "Ask Donna to coordinate the next ticket."
+          "Open this project's Codex Runners skill-flow board.",
+          "Ask Donna to route the next issue or cut it into tickets with /to-tickets."
         ]
       }
     });
@@ -41,7 +41,7 @@ describe("plugin distribution", () => {
       "codex-runners": "dist/bin/cli.mjs",
       "cr": "dist/bin/cli.mjs"
     });
-    expect(skill).toMatch(/^---\nname: codex-runners\ndescription: Use when /);
+    expect(skill).toMatch(/^---\nname: codex-runners\ndescription: "?Use when /);
     expect(agent).toContain('default_prompt: "Use $codex-runners');
     expect(license).toContain("MIT License");
     await expect(access(path.join(root, "dist/bin/cli.mjs"))).resolves.toBeUndefined();
@@ -52,7 +52,7 @@ describe("plugin distribution", () => {
   it("executes the bundled CLI under Node", async () => {
     const result = await execFileAsync(process.execPath, [path.join(root, "dist/bin/cli.mjs"), "--help"]);
 
-    expect(result.stdout).toContain("Local autonomous Kanban orchestration for Codex");
+    expect(result.stdout).toContain("Local skill-driven orchestration for Codex");
   });
 
   it("advertises every tool from the bundled MCP server", async () => {

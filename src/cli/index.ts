@@ -28,7 +28,7 @@ const exec = promisify(execFile);
 export function createCli(): Command {
   const program = new Command()
     .name("codex-runners")
-    .description("Local autonomous Kanban orchestration for Codex")
+    .description("Local skill-driven orchestration for Codex")
     .option("-g, --global", "operate on every active project")
     .version("0.1.0");
 

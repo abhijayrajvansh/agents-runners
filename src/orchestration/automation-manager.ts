@@ -181,7 +181,7 @@ export class AutomationManager {
     if (!automation) throw new Error(`Automation runtime for ${projectId} is unavailable`);
     const ticket = this.registry.getBoard(projectId).tickets.find(candidate => candidate.id === ticketId);
     if (!ticket) throw new Error(`Ticket ${ticketId} was not found`);
-    if (!["todo", "in_progress", "review", "qa"].includes(ticket.status)) {
+    if (!["ready_for_agent", "todo", "in_progress", "review", "qa"].includes(ticket.status)) {
       throw new Error(`${ticket.title} is not running and cannot be aborted`);
     }
     const result = await this.registry.updateTicket(projectId, ticketId, {
