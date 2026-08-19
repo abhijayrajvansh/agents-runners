@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/abhijayrajvansh/.nvm/versions/node/v24.13.1/bin/node' '/Users/abhijayrajvansh/plugins/codex-runners/dist/bin/cli.mjs' hook session-start",
+            "timeout": 10,
+            "statusMessage": "Starting Codex Runners"
+          }
+        ]
+      }
+    ]
+  }
+}

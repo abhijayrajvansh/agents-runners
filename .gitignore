@@ -10,3 +10,6 @@ coverage/
 .vitest/
 test-results/
 playwright-report/
+.codex-runners/runtime/
+.codex-runners/**/*.env
+.worktrees/codex-runners/

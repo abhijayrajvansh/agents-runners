@@ -1,0 +1,1 @@
+codex timed out after 45000 ms with a retry button that error message and automatically when i start chatting with the ei chat donna, the main ei project manager, the same url is getting opened in another tab
