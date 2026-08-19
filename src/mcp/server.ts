@@ -8,7 +8,6 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 
-import { ProjectConfigSchema } from "../domain/schema.js";
 import { projectConfigPath } from "../platform/paths.js";
 import { MCP_TOOL_NAMES, type McpToolName } from "./tools.js";
 
@@ -36,6 +35,12 @@ const projectRoot = z.string().min(1).optional().describe("Absolute project root
 const expectedRevision = z.number().int().nonnegative().describe("Latest board revision returned by get_board.");
 const ticketStatus = z.enum(["backlog", "todo", "in_progress", "qa", "review", "blocked"]);
 const runnerRole = z.enum(["developer", "reviewer", "qa"]);
+const ServerAddressSchema = z.object({
+  server: z.object({
+    host: z.literal("127.0.0.1").default("127.0.0.1"),
+    port: z.number().int().min(1024).max(65_535).default(4777)
+  }).default({ host: "127.0.0.1", port: 4777 })
+});
 const ticketInput = z.object({
   id: z.string().min(1).optional(),
   title: z.string().min(1),
@@ -134,8 +139,8 @@ export async function runStdioMcpServer(
     const requestedRoot = typeof input.projectRoot === "string" && input.projectRoot.trim().length > 0
       ? input.projectRoot
       : projectRoot;
-    const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(requestedRoot), "utf8")));
-    const baseUrl = `http://${config.server.host}:${config.server.port}`;
+    const address = await readProjectServerAddress(requestedRoot);
+    const baseUrl = `http://${address.host}:${address.port}`;
     const response = await fetch(`${baseUrl}/api/mcp/${name}`, {
       method: "POST",
       headers: { "content-type": "application/json" },
@@ -146,6 +151,16 @@ export async function runStdioMcpServer(
     return body;
   });
   await server.connect(new StdioServerTransport());
+}
+
+/**
+ * The stdio bridge only needs the daemon address. Keep this parse intentionally
+ * narrower than ProjectConfigSchema so an older long-lived MCP process remains
+ * compatible with newer board fields written by the daemon.
+ */
+export async function readProjectServerAddress(root: string): Promise<{ host: string; port: number }> {
+  const raw = JSON.parse(await readFile(projectConfigPath(root), "utf8")) as unknown;
+  return ServerAddressSchema.parse(raw).server;
 }
 
 function objectResult(value: unknown): Record<string, unknown> {

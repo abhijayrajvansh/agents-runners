@@ -125,7 +125,14 @@ export class WorktreeService {
   async integrationRef(config: ProjectConfig, refresh = true): Promise<string> {
     if (!await this.hasRemote(config)) return config.project.integrationBranch;
     if (refresh) await this.#fetchRemote(config);
-    return `${config.project.remote}/${config.project.integrationBranch}`;
+    const remoteRef = `refs/remotes/${config.project.remote}/${config.project.integrationBranch}`;
+    if (await this.#refExists(config.project.repositoryRoot, remoteRef)) {
+      return `${config.project.remote}/${config.project.integrationBranch}`;
+    }
+    if (await this.#refExists(config.project.repositoryRoot, `refs/heads/${config.project.integrationBranch}`)) {
+      return config.project.integrationBranch;
+    }
+    return (await this.commands.run("git", ["rev-parse", "HEAD"], { cwd: config.project.repositoryRoot })).stdout.trim();
   }
 
   async #fetchRemote(config: ProjectConfig): Promise<void> {
@@ -155,8 +162,12 @@ export class WorktreeService {
   }
 
   async #branchExists(repositoryRoot: string, branch: string): Promise<boolean> {
+    return this.#refExists(repositoryRoot, `refs/heads/${branch}`);
+  }
+
+  async #refExists(repositoryRoot: string, ref: string): Promise<boolean> {
     try {
-      await this.commands.run("git", ["show-ref", "--verify", `refs/heads/${branch}`], { cwd: repositoryRoot });
+      await this.commands.run("git", ["show-ref", "--verify", ref], { cwd: repositoryRoot });
       return true;
     } catch (error) {
       if (error instanceof CommandError) return false;

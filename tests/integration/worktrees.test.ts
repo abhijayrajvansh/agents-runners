@@ -41,6 +41,28 @@ describe("WorktreeService", () => {
       .toBe("FAKE_KEY=development-only\n");
   });
 
+  it("falls back to the local integration branch when the remote branch is unavailable", async () => {
+    const project = await createGitProjectWithRemote();
+    cleanups.push(project.cleanup);
+    await project.git(["push", "origin", "--delete", "dev"]);
+    await project.git(["fetch", "--prune", "origin"]);
+    const config = projectConfig({
+      project: {
+        id: "demo",
+        name: "Demo",
+        repositoryRoot: project.root,
+        integrationBranch: "dev",
+        remote: "origin"
+      }
+    });
+    const service = new WorktreeService(new CommandRunner());
+
+    const runner = await service.ensureRunner(config, "developer", 1);
+
+    expect(await project.git(["rev-parse", "HEAD"], runner.worktreePath))
+      .toBe(await project.git(["rev-parse", "dev"]));
+  });
+
   it("fast-forwards a clean persistent runner to a requested candidate branch", async () => {
     const project = await createGitProjectWithRemote();
     cleanups.push(project.cleanup);

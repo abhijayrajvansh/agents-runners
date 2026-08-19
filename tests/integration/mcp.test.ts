@@ -2,12 +2,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 
-import { createMcpServer } from "../../src/mcp/server.js";
+import { createMcpServer, readProjectServerAddress } from "../../src/mcp/server.js";
 import { MCP_TOOL_NAMES } from "../../src/mcp/tools.js";
 import { McpTools } from "../../src/mcp/tools.js";
 import { EventBus } from "../../src/server/event-bus.js";
 import { ProjectRegistry } from "../../src/server/project-registry.js";
 import { createInitializedProject } from "../helpers/initialized-project.js";
+import { readFile, writeFile } from "node:fs/promises";
+import path from "node:path";
 
 const cleanups: Array<() => Promise<void>> = [];
 
@@ -16,6 +18,32 @@ afterEach(async () => {
 });
 
 describe("Codex Runners MCP tools", () => {
+  it("keeps the stdio bridge compatible with newer board fields", async () => {
+    const initialized = await createInitializedProject();
+    cleanups.push(initialized.cleanup);
+    const configPath = path.join(initialized.root, ".codex-runners", "config.json");
+    const config = JSON.parse(await readFile(configPath, "utf8")) as Record<string, unknown>;
+    config.donna = { model: "gpt-5.6-luna", reasoningEffort: "low", timeoutMs: 180_000 };
+    config.board = {
+      ...(config.board as Record<string, unknown>),
+      tickets: [{
+        id: "ticket-1",
+        title: "Interactive Codex session",
+        kind: "ticket",
+        source: "donna",
+        status: "todo",
+        createdAt: "2026-08-19T12:00:00.000Z",
+        updatedAt: "2026-08-19T12:00:00.000Z"
+      }]
+    };
+    await writeFile(configPath, JSON.stringify(config), "utf8");
+
+    await expect(readProjectServerAddress(initialized.root)).resolves.toEqual({
+      host: "127.0.0.1",
+      port: 4777
+    });
+  });
+
   it("advertises and executes the complete typed MCP surface", async () => {
     const calls: string[] = [];
     const server = createMcpServer(async (name, input) => {
