@@ -2,7 +2,7 @@ import path from "node:path";
 
 import type { ProjectConfig } from "../domain/types.js";
 import { projectRuntimePath } from "../platform/paths.js";
-import type { CodexEvent, CodexService } from "../runners/codex-service.js";
+import type { CodexEvent, CodexService, CodexTurnInput } from "../runners/codex-service.js";
 import type { TmuxService } from "../runners/tmux-service.js";
 import type { DonnaConversationMessage, ProjectRuntimeRepository } from "../runtime/project-runtime.js";
 import type { EventBus } from "../server/event-bus.js";
@@ -105,7 +105,8 @@ export class DonnaService {
     });
     emit({ type: "started", projectId, source });
     let lastMessage = "";
-    const turnInput = {
+    const savedThreadId = runtime.getDonnaThread(projectId);
+    const turnInput = (threadId?: string): CodexTurnInput => ({
       pane,
       runtimeDirectory: path.join(projectRuntimePath(project.project.repositoryRoot), "donna"),
       worktreePath: project.project.repositoryRoot,
@@ -114,16 +115,25 @@ export class DonnaService {
       model: project.donna?.model ?? "gpt-5.6-luna",
       reasoningEffort: project.donna?.reasoningEffort ?? "low",
       timeoutMs: 45_000,
-      env: { CODEX_RUNNERS_PROJECT_ROOT: project.project.repositoryRoot }
-    };
-    const result = await this.dependencies.codex.runTurn(turnInput, (event: CodexEvent) => {
+      env: { CODEX_RUNNERS_PROJECT_ROOT: project.project.repositoryRoot },
+      ...(threadId ? { threadId } : {})
+    });
+    const handleEvent = (event: CodexEvent) => {
+      if (event.type === "thread.started") runtime.setDonnaThread(projectId, event.threadId);
       if (event.type !== "message.completed") return;
       lastMessage = event.text;
       const donnaEvent: DonnaEvent = { type: "message", projectId, text: event.text };
       emit(donnaEvent);
       this.#publish(projectId, donnaEvent);
-    });
+    };
+    let result = await this.dependencies.codex.runTurn(turnInput(savedThreadId), handleEvent);
+    if (savedThreadId && result.exitCode !== 0) {
+      runtime.clearDonnaThread(projectId);
+      lastMessage = "";
+      result = await this.dependencies.codex.runTurn(turnInput(), handleEvent);
+    }
     if (result.exitCode !== 0) throw new Error(`Donna exited with code ${result.exitCode}: ${result.message}`);
+    if (result.threadId) runtime.setDonnaThread(projectId, result.threadId);
     if (result.message) runtime.appendDonnaMessage(projectId, { author: "donna", text: result.message, source });
     if (result.message && result.message !== lastMessage) {
       const messageEvent: DonnaEvent = { type: "message", projectId, text: result.message };

@@ -31,6 +31,7 @@ export interface ProjectRuntimeRepository {
   setTicket(projectId: string, ticketId: string, state: TicketRuntimeState): void;
   getDonnaThread(projectId: string): string | undefined;
   setDonnaThread(projectId: string, threadId: string): void;
+  clearDonnaThread(projectId: string): void;
   getDonnaMessages(projectId: string): DonnaConversationMessage[];
   appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">): DonnaConversationMessage;
   getBlockerNotification(projectId: string, ticketId: string): string | undefined;
@@ -60,6 +61,10 @@ export class MemoryProjectRuntime implements ProjectRuntimeRepository {
 
   setDonnaThread(projectId: string, threadId: string): void {
     this.#donnaThreads.set(projectId, threadId);
+  }
+
+  clearDonnaThread(projectId: string): void {
+    this.#donnaThreads.delete(projectId);
   }
 
   getDonnaMessages(projectId: string): DonnaConversationMessage[] {
@@ -122,6 +127,11 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
 
   setDonnaThread(projectId: string, threadId: string): void {
     this.#document.donnaThreads[projectId] = threadId;
+    this.#persist();
+  }
+
+  clearDonnaThread(projectId: string): void {
+    delete this.#document.donnaThreads[projectId];
     this.#persist();
   }
 

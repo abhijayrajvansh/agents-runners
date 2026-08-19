@@ -37,6 +37,8 @@ Donna uses a model independently from the delivery runner pools:
 
 Change either value in `.codex-runners/config.json`. Existing Donna threads are resumed with the configured model, so conversation context remains intact when the model changes.
 
+Donna's browser messages, persistent Codex thread ID, and recent conversation are stored under `.codex-runners/runtime/project-runtime.json`. `start` and `restart` reload that history and resume the same model thread in the Donna tmux window. If Codex reports that the saved thread is unavailable, Donna clears only that stale thread reference, starts a new thread, and seeds it with the persisted recent conversation.
+
 ## Automation
 
 | Field | Default | Meaning |

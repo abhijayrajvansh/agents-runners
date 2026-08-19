@@ -14,7 +14,7 @@ afterEach(async () => {
 });
 
 describe("DonnaService", () => {
-  it("keeps conversation context without resuming an unbounded model thread", async () => {
+  it("persists and resumes the shared Donna model thread", async () => {
     const initialized = await createInitializedProject();
     cleanups.push(initialized.cleanup);
     const events = new EventBus();
@@ -38,11 +38,11 @@ describe("DonnaService", () => {
     const terminalEvents = await collect(donna.send(project.project.id, "Continue", "terminal"));
 
     expect(codex.runTurn.mock.calls[0]?.[0]).not.toHaveProperty("threadId");
-    expect(codex.runTurn.mock.calls[1]?.[0]).not.toHaveProperty("threadId");
+    expect(codex.runTurn.mock.calls[1]?.[0]).toMatchObject({ threadId: "donna-thread-1" });
     expect(codex.runTurn.mock.calls[1]?.[0].prompt).toContain("Donna: Reply 1");
     expect(browserEvents).toContainEqual(expect.objectContaining({ type: "message", text: "Reply 1" }));
     expect(terminalEvents.at(-1)).toMatchObject({ type: "completed", message: "Reply 2" });
-    expect(runtime.getDonnaThread(project.project.id)).toBeUndefined();
+    expect(runtime.getDonnaThread(project.project.id)).toBe("donna-thread-1");
   });
 });
 
