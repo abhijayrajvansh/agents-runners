@@ -5,7 +5,7 @@ import { CommandRunner } from "../process/command-runner.js";
 import { CodexService } from "../runners/codex-service.js";
 import { TmuxService } from "../runners/tmux-service.js";
 import { WorktreeService } from "../runners/worktree-service.js";
-import { JsonProjectRuntime, type ProjectRuntimeRepository } from "../runtime/project-runtime.js";
+import { JsonProjectRuntime, type ProjectRuntimeRepository, type TicketDeliveryState } from "../runtime/project-runtime.js";
 import { Redactor } from "../security/redactor.js";
 import type { EventBus, ProjectEvent } from "../server/event-bus.js";
 import type { ProjectRegistry } from "../server/project-registry.js";
@@ -42,6 +42,7 @@ export class AutomationManager {
   readonly codex: CodexService;
   readonly integration: IntegrationService;
   #projects = new Map<string, ProjectAutomation>();
+  #merges = new Map<string, Promise<TicketDeliveryState>>();
 
   constructor(registry: ProjectRegistry, events: EventBus, options: { codexCommand?: string } = {}) {
     this.registry = registry;
@@ -107,6 +108,13 @@ export class AutomationManager {
     const heartbeat = setInterval(() => this.reconcile(projectId), 2_000);
     heartbeat.unref();
     this.#projects.set(projectId, { runtime, pools, scheduler, unsubscribe, heartbeat });
+    for (const ticket of config.board.tickets.filter(candidate => candidate.status === "done")) {
+      const state = runtime.getTicket(projectId, ticket.id);
+      if (state.mergeState !== "merging") continue;
+      state.mergeState = "failed";
+      state.mergeError = "The previous merge was interrupted. Retry when ready.";
+      runtime.setTicket(projectId, ticket.id, state);
+    }
     void this.#hydrateInteractiveWindows(projectId, config);
     for (const ticket of config.board.tickets.filter(candidate => candidate.status === "blocked")) {
       this.#notifyBlocker(projectId, ticket);
@@ -138,6 +146,76 @@ export class AutomationManager {
     return this.list(projectId).find(runner => runner.id === runnerId);
   }
 
+  deliveries(projectId: string): Record<string, TicketDeliveryState> {
+    const config = this.registry.get(projectId);
+    const runtime = this.runtimeFor(config);
+    return Object.fromEntries(config.board.tickets.map(ticket => {
+      const state = runtime.getTicket(projectId, ticket.id);
+      return [ticket.id, {
+        ...(state.deliveryBranch ? { deliveryBranch: state.deliveryBranch } : {}),
+        ...(state.integrationCommit ? { integrationCommit: state.integrationCommit } : {}),
+        ...(state.mergeState ? { mergeState: state.mergeState } : {}),
+        ...(state.mergeError ? { mergeError: state.mergeError } : {})
+      }];
+    }));
+  }
+
+  mergeTicket(projectId: string, ticketId: string): Promise<TicketDeliveryState> {
+    const key = `${projectId}:${ticketId}`;
+    const active = this.#merges.get(key);
+    if (active) return active;
+    const merge = this.#mergeTicket(projectId, ticketId).finally(() => this.#merges.delete(key));
+    this.#merges.set(key, merge);
+    return merge;
+  }
+
+  async #mergeTicket(projectId: string, ticketId: string): Promise<TicketDeliveryState> {
+    const project = this.registry.get(projectId);
+    const ticket = project.board.tickets.find(candidate => candidate.id === ticketId);
+    if (!ticket) throw new Error(`Ticket ${ticketId} was not found`);
+    const automation = this.#projects.get(projectId);
+    if (!automation) throw new Error(`Automation runtime for ${projectId} is unavailable`);
+    const state = automation.runtime.getTicket(projectId, ticketId);
+    if (ticket.status !== "done" || !["ready", "failed"].includes(state.mergeState ?? "") || !state.deliveryBranch || !state.developerRunnerId) {
+      throw new Error(`${ticket.title} is not ready to merge`);
+    }
+    state.mergeState = "merging";
+    delete state.mergeError;
+    automation.runtime.setTicket(projectId, ticketId, state);
+    this.#publishDelivery(projectId, ticketId, state);
+    try {
+      const verification = [
+        ...project.verification.typecheck,
+        ...project.verification.test,
+        ...project.verification.lint,
+        ...project.verification.build,
+        ...project.verification.ui
+      ];
+      const result = await this.integration.integrate(project, state.deliveryBranch, verification);
+      state.integrationCommit = result.commit;
+      state.mergeState = "merged";
+      automation.runtime.setTicket(projectId, ticketId, state);
+      await this.worktrees.removeDeliveryBranch(project, state.deliveryBranch);
+      this.#publishDelivery(projectId, ticketId, state);
+      return this.deliveries(projectId)[ticketId] ?? {};
+    } catch (error) {
+      state.mergeState = "failed";
+      state.mergeError = error instanceof Error ? error.message : String(error);
+      automation.runtime.setTicket(projectId, ticketId, state);
+      this.#publishDelivery(projectId, ticketId, state);
+      throw error;
+    }
+  }
+
+  #publishDelivery(projectId: string, ticketId: string, state: TicketDeliveryState): void {
+    this.events.publish({
+      type: "ticket.delivery",
+      projectId,
+      revision: this.registry.getBoard(projectId).revision,
+      payload: { ticketId, delivery: state }
+    });
+  }
+
   async terminals(projectId: string): Promise<AgentTerminalSnapshot[]> {
     this.registry.get(projectId);
     const session = sessionName(projectId);
@@ -153,7 +231,7 @@ export class AutomationManager {
       return {
         id,
         role: id === "donna" ? "donna" as const : runner?.role ?? roleFromRunnerId(id),
-        status: pane.pid === 0 ? "unhealthy" : runner?.status ?? "idle",
+        status: pane.pid === 0 ? "unhealthy" : runner?.status === "working" ? "working" : runner?.status === "unhealthy" ? "unhealthy" : "idle",
         ...(runner?.ticketId ? { ticketId: runner.ticketId } : {}),
         command: id === "donna" ? pane.command : "codex",
         pid: pane.pid,
@@ -262,14 +340,17 @@ class PreparedStageExecutor implements StageExecutor {
   }
 
   async execute(input: StageExecution): Promise<StageExecutionResult> {
-    const target = input.runner.role === "developer" || !input.runtime.developerRunnerId
-      ? await this.worktrees.integrationRef(input.project, false)
-      : `${input.project.worktrees.branchPrefix}/${input.runtime.developerRunnerId}`;
+    const target = input.runner.role === "developer"
+      ? input.runtime.deliveryBranch ?? await this.worktrees.integrationRef(input.project, false)
+      : input.runtime.deliveryBranch
+        ?? (input.runtime.developerRunnerId
+          ? `${input.project.worktrees.branchPrefix}/${input.runtime.developerRunnerId}`
+          : await this.worktrees.integrationRef(input.project, false));
     await this.worktrees.synchronize(
       input.project,
       input.runner.worktreePath,
       target,
-      input.runner.role === "developer" ? "merge" : "exact",
+      "exact",
       assignedRunnerId(input) === input.runner.id
     );
     return this.delegate.execute(input);
@@ -277,6 +358,13 @@ class PreparedStageExecutor implements StageExecutor {
 
   integrate(input: StageExecution): Promise<{ commit: string }> {
     return this.delegate.integrate(input);
+  }
+
+  async seal(input: StageExecution): Promise<{ branch: string }> {
+    const sourceBranch = input.runtime.developerRunnerId
+      ? `${input.project.worktrees.branchPrefix}/${input.runtime.developerRunnerId}`
+      : input.runner.branch;
+    return { branch: await this.worktrees.sealDelivery(input.project, sourceBranch, input.ticket.id) };
   }
 }
 

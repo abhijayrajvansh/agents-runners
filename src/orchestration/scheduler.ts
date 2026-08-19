@@ -22,6 +22,7 @@ export type StageExecutionResult = {
 export interface StageExecutor {
   execute(input: StageExecution): Promise<StageExecutionResult>;
   integrate(input: StageExecution): Promise<{ commit: string }>;
+  seal?(input: StageExecution): Promise<{ branch: string }>;
 }
 
 export type SchedulerDependencies = {
@@ -74,7 +75,7 @@ export class Scheduler {
       const project = this.dependencies.registry.get(projectId);
       if (!project.automation.enabled) return;
       if (await this.#reconcileBlockers(projectId, project)) continue;
-      const candidates = eligibleTickets(project);
+      const candidates = eligibleTickets(project, this.dependencies.runtime);
       const assignments: Array<{ ticket: Ticket; runner: RunnerRecord; pool: RunnerPool }> = [];
 
       for (const ticket of candidates) {
@@ -179,8 +180,13 @@ export class Scheduler {
     let status: TicketStatus;
 
     if (result.kind === "passed" && ticket.status === "qa") {
-      const integrated = await this.dependencies.executor.integrate(execution);
-      runtime.integrationCommit = integrated.commit;
+      if (!runtime.deliveryBranch) {
+        runtime.deliveryBranch = this.dependencies.executor.seal
+          ? (await this.dependencies.executor.seal(execution)).branch
+          : `${currentProject.worktrees.branchPrefix}/${runtime.developerRunnerId ?? runner.id}`;
+      }
+      runtime.mergeState = "ready";
+      delete runtime.mergeError;
       status = "done";
     } else {
       if (result.kind === "failed") runtime.attempts += 1;
@@ -190,6 +196,11 @@ export class Scheduler {
         attempts: runtime.attempts,
         maxRetries: currentProject.automation.maxRetries
       });
+    }
+    if (result.kind === "passed" && ticket.status === "in_progress") {
+      runtime.deliveryBranch = this.dependencies.executor.seal
+        ? (await this.dependencies.executor.seal(execution)).branch
+        : runner.branch;
     }
     this.dependencies.runtime.setTicket(projectId, ticket.id, runtime);
     const blocker = status === "blocked" ? blockerForResult(currentProject, ticket, result) : null;
@@ -215,7 +226,7 @@ export class Scheduler {
   }
 
   async #reconcileBlockers(projectId: string, project: ProjectConfig): Promise<boolean> {
-    const done = new Set(project.board.tickets.filter(ticket => ticket.status === "done").map(ticket => ticket.id));
+    const done = completedTicketIds(project, this.dependencies.runtime);
     for (const ticket of project.board.tickets) {
       const unfinished = ticket.dependencies.filter(dependency => !done.has(dependency));
       if (project.automation.actionableStatuses.includes(ticket.status) && unfinished.length > 0) {
@@ -283,12 +294,20 @@ function blockerForResult(project: ProjectConfig, ticket: Ticket, result: StageE
   };
 }
 
-function eligibleTickets(project: ProjectConfig): Ticket[] {
-  const completed = new Set(project.board.tickets.filter(ticket => ticket.status === "done").map(ticket => ticket.id));
+function eligibleTickets(project: ProjectConfig, runtime: ProjectRuntimeRepository): Ticket[] {
+  const completed = completedTicketIds(project, runtime);
   return project.board.tickets.filter(ticket => (
     project.automation.actionableStatuses.includes(ticket.status) &&
     ticket.dependencies.every(dependency => completed.has(dependency))
   ));
+}
+
+function completedTicketIds(project: ProjectConfig, runtime: ProjectRuntimeRepository): Set<string> {
+  return new Set(project.board.tickets.filter(ticket => {
+    if (ticket.status !== "done") return false;
+    const mergeState = runtime.getTicket(project.project.id, ticket.id).mergeState;
+    return mergeState !== "ready" && mergeState !== "merging" && mergeState !== "failed";
+  }).map(ticket => ticket.id));
 }
 
 function roleForStatus(status: TicketStatus): RoleName | null {

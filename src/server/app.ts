@@ -19,7 +19,7 @@ export type AppDependencies = {
   onProjectUnregistered?: (projectId: string, root: string) => Promise<void> | void;
   donna?: DonnaService;
   mcpTools?: McpTools;
-  automation?: Pick<AutomationManager, "list" | "get"> & Partial<Pick<AutomationManager, "terminals">>;
+  automation?: Pick<AutomationManager, "list" | "get"> & Partial<Pick<AutomationManager, "terminals" | "deliveries" | "mergeTicket">>;
   publicDirectory?: string;
   publicAccessToken?: string;
 };
@@ -149,6 +149,19 @@ export function createApp(dependencies: AppDependencies): Express {
     const projectId = requiredParam(request.params.projectId);
     dependencies.registry.get(projectId);
     response.json({ runners: dependencies.automation?.list(projectId) ?? [] });
+  }));
+
+  app.get("/api/projects/:projectId/deliveries", asyncRoute(async (request, response) => {
+    const projectId = requiredParam(request.params.projectId);
+    dependencies.registry.get(projectId);
+    response.json({ deliveries: dependencies.automation?.deliveries?.(projectId) ?? {} });
+  }));
+
+  app.post("/api/projects/:projectId/tickets/:ticketId/merge", asyncRoute(async (request, response) => {
+    if (!dependencies.automation?.mergeTicket) throw new Error("Merge service is unavailable");
+    const projectId = requiredParam(request.params.projectId);
+    const ticketId = requiredParam(request.params.ticketId);
+    response.json({ delivery: await dependencies.automation.mergeTicket(projectId, ticketId) });
   }));
 
   app.get("/api/projects/:projectId/runners/:runnerId", asyncRoute(async (request, response) => {

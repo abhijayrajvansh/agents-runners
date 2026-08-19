@@ -15,6 +15,7 @@ import {
 
 import type { ProjectConfig, Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
+import type { TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
 import { Column } from "./column.js";
 
 export type BoardProps = {
@@ -23,9 +24,11 @@ export type BoardProps = {
   onMove(ticketId: string, status: TicketStatus, expectedRevision: number): Promise<void> | void;
   onOpenTicket(ticketId: string): void;
   compactCards?: boolean;
+  deliveries?: Record<string, TicketDeliveryState>;
+  onMerge?(ticketId: string): Promise<void> | void;
 };
 
-export function Board({ project, runners, onMove, onOpenTicket, compactCards = false }: BoardProps) {
+export function Board({ project, runners, onMove, onOpenTicket, compactCards = false, deliveries = {}, onMerge = () => undefined }: BoardProps) {
   const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
@@ -68,6 +71,9 @@ export function Board({ project, runners, onMove, onOpenTicket, compactCards = f
               revision={project.board.revision}
               onMove={onMove}
               onOpenTicket={onOpenTicket}
+              deliveries={deliveries}
+              onMerge={onMerge}
+              mergeBranch={project.project.integrationBranch}
               compactCards={compactCards}
               dragActive={Boolean(activeTicket)}
               manualDropTarget={isManualDropTarget(column.status)}

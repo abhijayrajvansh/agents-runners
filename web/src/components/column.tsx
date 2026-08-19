@@ -2,6 +2,7 @@ import { useDroppable } from "@dnd-kit/core";
 
 import type { Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
+import type { TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
 import { TicketCard } from "./ticket-card.js";
 
 const labels: Record<TicketStatus, string> = {
@@ -26,9 +27,12 @@ export type ColumnProps = {
   label?: string;
   dragActive: boolean;
   manualDropTarget: boolean;
+  deliveries: Record<string, TicketDeliveryState>;
+  onMerge(ticketId: string): Promise<void> | void;
+  mergeBranch: string;
 };
 
-export function Column({ status, tickets, allTickets, runners, revision, onMove, onOpenTicket, compactCards, label, dragActive, manualDropTarget }: ColumnProps) {
+export function Column({ status, tickets, allTickets, runners, revision, onMove, onOpenTicket, compactCards, label, dragActive, manualDropTarget, deliveries, onMerge, mergeBranch }: ColumnProps) {
   const droppable = useDroppable({ id: status, disabled: !manualDropTarget });
   const displayLabel = label ?? labels[status];
   return (
@@ -57,6 +61,9 @@ export function Column({ status, tickets, allTickets, runners, revision, onMove,
             onOpen={onOpenTicket}
             compact={compactCards}
             blockerKind={ticket.dependencies.some(id => allTickets.find(candidate => candidate.id === id)?.status !== "done") ? "dependency" : "human_input"}
+            delivery={deliveries[ticket.id]}
+            onMerge={onMerge}
+            mergeBranch={mergeBranch}
           />
         ))}
         {tickets.length === 0 && <div className="column-empty">No tickets</div>}

@@ -115,6 +115,8 @@ export function App() {
             runners={state.runners}
             onMove={state.moveTicket}
             onOpenTicket={openTicket}
+            deliveries={state.deliveries}
+            onMerge={state.mergeTicket}
             compactCards={compactCards}
           />
         </section>

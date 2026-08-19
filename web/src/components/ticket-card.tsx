@@ -1,9 +1,10 @@
 import { useDraggable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { ArrowRight, CircleDot, GripVertical } from "lucide-react";
+import { ArrowRight, Check, CircleDot, GitMerge, GripVertical, LoaderCircle, RotateCcw } from "lucide-react";
 
 import type { Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
+import type { TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
 
 const nextStatus: Partial<Record<TicketStatus, TicketStatus>> = {
   backlog: "todo",
@@ -32,9 +33,12 @@ export type TicketCardProps = {
   onOpen(ticketId: string): void;
   compact: boolean;
   blockerKind?: "dependency" | "human_input";
+  delivery?: TicketDeliveryState | undefined;
+  onMerge(ticketId: string): Promise<void> | void;
+  mergeBranch: string;
 };
 
-export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, blockerKind }: TicketCardProps) {
+export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, blockerKind, delivery, onMerge, mergeBranch }: TicketCardProps) {
   const humanMovable = ticket.status === "backlog" || ticket.status === "blocked";
   const draggable = useDraggable({ id: ticket.id, data: { ticket }, disabled: !humanMovable });
   const upcoming = humanMovable ? nextStatus[ticket.status] : undefined;
@@ -104,6 +108,22 @@ export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, 
         >
           {statusLabels[upcoming]} <ArrowRight size={13} />
         </button>
+      )}
+      {ticket.status === "done" && delivery?.mergeState === "ready" && (
+        <button type="button" className="ticket-merge" onClick={() => void onMerge(ticket.id)}>
+          <GitMerge size={13} /> Merge to {mergeBranch}
+        </button>
+      )}
+      {ticket.status === "done" && delivery?.mergeState === "merging" && (
+        <button type="button" className="ticket-merge" disabled><LoaderCircle className="spin" size={13} /> Merging…</button>
+      )}
+      {ticket.status === "done" && delivery?.mergeState === "failed" && (
+        <button type="button" className="ticket-merge ticket-merge--retry" title={delivery.mergeError} onClick={() => void onMerge(ticket.id)}>
+          <RotateCcw size={13} /> Retry merge
+        </button>
+      )}
+      {ticket.status === "done" && delivery?.mergeState === "merged" && (
+        <div className="ticket-merged"><Check size={13} /> Merged</div>
       )}
     </article>
   );

@@ -52,6 +52,28 @@ export class WorktreeService {
     return { branch, worktreePath };
   }
 
+  async sealDelivery(config: ProjectConfig, sourceBranch: string, ticketId: string): Promise<string> {
+    const safeTicket = ticketId.replace(/[^a-zA-Z0-9_-]/g, "-");
+    const branch = `${config.worktrees.branchPrefix}/ticket-${safeTicket}`;
+    const commit = (await this.commands.run("git", ["rev-parse", sourceBranch], { cwd: config.project.repositoryRoot })).stdout.trim();
+    await this.commands.run("git", ["update-ref", `refs/heads/${branch}`, commit], { cwd: config.project.repositoryRoot });
+    if (await this.hasRemote(config) && config.automation.autoPush) {
+      await this.commands.run("git", ["push", config.project.remote, `+${branch}:${branch}`], { cwd: config.project.repositoryRoot });
+    }
+    return branch;
+  }
+
+  async removeDeliveryBranch(config: ProjectConfig, branch: string): Promise<void> {
+    await this.commands.run("git", ["branch", "-D", branch], { cwd: config.project.repositoryRoot }).catch(error => {
+      if (!(error instanceof CommandError)) throw error;
+    });
+    if (await this.hasRemote(config)) {
+      await this.commands.run("git", ["push", config.project.remote, "--delete", branch], { cwd: config.project.repositoryRoot }).catch(error => {
+        if (!(error instanceof CommandError)) throw error;
+      });
+    }
+  }
+
   async synchronize(
     config: ProjectConfig,
     worktreePath: string,

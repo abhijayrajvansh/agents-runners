@@ -74,9 +74,10 @@ export class CodexStageExecutor implements StageExecutor {
       ...input.project.verification.build,
       ...input.project.verification.ui
     ];
-    const candidateBranch = input.runtime.developerRunnerId
-      ? `${input.project.worktrees.branchPrefix}/${input.runtime.developerRunnerId}`
-      : input.runner.branch;
+    const candidateBranch = input.runtime.deliveryBranch
+      ?? (input.runtime.developerRunnerId
+        ? `${input.project.worktrees.branchPrefix}/${input.runtime.developerRunnerId}`
+        : input.runner.branch);
     const result = await this.integration.integrate(input.project, candidateBranch, verification);
     return { commit: result.commit };
   }

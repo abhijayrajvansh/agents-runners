@@ -15,7 +15,7 @@ afterEach(async () => {
 });
 
 describe("Scheduler", () => {
-  it("delivers dependency-ordered tickets through development, review, QA, and Done", async () => {
+  it("waits for a dependency merge before starting dependent work", async () => {
     const project = await createInitializedProject();
     cleanups.push(project.cleanup);
     const harness = await workflowHarness(project.root, new ScriptedExecutor());
@@ -32,12 +32,16 @@ describe("Scheduler", () => {
     });
 
     await harness.scheduler.reconcile(harness.config.project.id);
-    const board = harness.registry.getBoard(harness.config.project.id);
-
-    expect(board.tickets.map(ticket => [ticket.id, ticket.status])).toEqual([
+    expect(harness.registry.getBoard(harness.config.project.id).tickets.map(ticket => [ticket.id, ticket.status])).toEqual([
       ["foundation", "done"],
-      ["dependent", "done"]
+      ["dependent", "blocked"]
     ]);
+    const foundation = harness.runtime.getTicket(harness.config.project.id, "foundation");
+    foundation.mergeState = "merged";
+    foundation.integrationCommit = "merged-foundation";
+    harness.runtime.setTicket(harness.config.project.id, "foundation", foundation);
+    await harness.scheduler.reconcile(harness.config.project.id);
+    expect(harness.registry.getBoard(harness.config.project.id).tickets.find(ticket => ticket.id === "dependent")?.status).toBe("done");
     expect(harness.executor.calls.filter(call => call.ticketId === "dependent")[0]?.afterTicketIds)
       .toContain("foundation");
   });

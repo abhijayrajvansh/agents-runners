@@ -82,14 +82,14 @@ export const ProjectConfigSchema = z.object({
     enabled: z.boolean().default(true),
     fullAccess: z.boolean().default(true),
     maxRetries: z.number().int().min(0).max(10).default(3),
-    autoMerge: z.boolean().default(true),
+    autoMerge: z.boolean().default(false),
     autoPush: z.boolean().default(true),
     actionableStatuses: z.array(TicketStatusSchema).default([...actionableStatuses])
   }).strict().default({
     enabled: true,
     fullAccess: true,
     maxRetries: 3,
-    autoMerge: true,
+    autoMerge: false,
     autoPush: true,
     actionableStatuses: [...actionableStatuses]
   }),

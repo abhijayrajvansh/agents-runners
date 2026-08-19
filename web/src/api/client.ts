@@ -2,7 +2,7 @@ import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../../../src
 import { ticketSearchScore } from "../../../src/domain/ticket-search.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 import type { AgentTerminalSnapshot } from "../../../src/orchestration/automation-manager.js";
-import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
+import type { DonnaConversationMessage, TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
 import type { CodexModelOption } from "../../../src/runners/codex-models.js";
 import type { DonnaEvent } from "../../../src/donna/donna-service.js";
 
@@ -44,6 +44,21 @@ export class RunnersApi {
   async listRunners(projectId: string): Promise<RunnerRecord[]> {
     const response = await this.#request<{ runners: RunnerRecord[] }>(`/api/projects/${encodeURIComponent(projectId)}/runners`);
     return response.runners;
+  }
+
+  async listDeliveries(projectId: string): Promise<Record<string, TicketDeliveryState>> {
+    const response = await this.#request<{ deliveries: Record<string, TicketDeliveryState> }>(
+      `/api/projects/${encodeURIComponent(projectId)}/deliveries`
+    );
+    return response.deliveries;
+  }
+
+  async mergeTicket(projectId: string, ticketId: string): Promise<TicketDeliveryState> {
+    const response = await this.#request<{ delivery: TicketDeliveryState }>(
+      `/api/projects/${encodeURIComponent(projectId)}/tickets/${encodeURIComponent(ticketId)}/merge`,
+      { method: "POST" }
+    );
+    return response.delivery;
   }
 
   async listTerminals(projectId: string): Promise<AgentTerminalSnapshot[]> {

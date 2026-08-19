@@ -9,7 +9,14 @@ export type TicketRuntimeState = {
   reviewerRunnerId?: string;
   qaRunnerId?: string;
   integrationCommit?: string;
+  deliveryBranch?: string;
+  mergeState?: "ready" | "merging" | "merged" | "failed";
+  mergeError?: string;
 };
+
+export type TicketDeliveryState = Pick<TicketRuntimeState,
+  "deliveryBranch" | "integrationCommit" | "mergeState" | "mergeError"
+>;
 
 export type DonnaConversationMessage = {
   id: string;

@@ -110,6 +110,14 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .ticket-card__title { display: block; width: 100%; margin: 8px 0 5px; padding: 0; border: 0; background: none; text-align: left; font-size: 13px; font-weight: 500; line-height: 1.28; cursor: pointer; }
 .ticket-card > p { display: -webkit-box; overflow: hidden; margin: 0 0 14px; color: var(--muted); font-size: 11px; line-height: 1.42; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
 .ticket-card__footer { padding-top: 10px; border-top: 1px solid #f0f0ec; color: var(--faint); font-size: 9px; }
+.ticket-merge, .ticket-merged { display: flex; width: 100%; align-items: center; justify-content: center; gap: 6px; margin-top: 10px; padding: 9px 10px; border-radius: 7px; font: inherit; font-size: 10px; font-weight: 600; }
+.ticket-merge { border: 1px solid #171715; background: #171715; color: white; cursor: pointer; }
+.ticket-merge:hover { background: #30302d; }
+.ticket-merge:disabled { border-color: #d7d7d1; background: #efefeb; color: #777770; cursor: wait; }
+.ticket-merge--retry { border-color: #bd4b43; background: #bd4b43; }
+.ticket-merged { border: 1px solid #cce3d6; background: #edf7f1; color: #16734b; }
+.spin { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .priority-label { display: inline-flex; align-items: center; gap: 4px; text-transform: capitalize; }
 .runner-pill { padding: 3px 6px; border-radius: 10px; background: #f0f0ec; color: #686863; text-transform: capitalize; }
 .unassigned { color: #b0b0aa; }
