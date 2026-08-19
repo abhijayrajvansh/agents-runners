@@ -24,16 +24,20 @@ export type ColumnProps = {
   onOpenTicket(ticketId: string): void;
   compactCards: boolean;
   label?: string;
+  dragActive: boolean;
+  manualDropTarget: boolean;
 };
 
-export function Column({ status, tickets, allTickets, runners, revision, onMove, onOpenTicket, compactCards, label }: ColumnProps) {
-  const droppable = useDroppable({ id: status });
+export function Column({ status, tickets, allTickets, runners, revision, onMove, onOpenTicket, compactCards, label, dragActive, manualDropTarget }: ColumnProps) {
+  const droppable = useDroppable({ id: status, disabled: !manualDropTarget });
   const displayLabel = label ?? labels[status];
   return (
     <section
       ref={droppable.setNodeRef}
       className="board-column"
       data-over={droppable.isOver || undefined}
+      data-manual-drop-target={manualDropTarget ? "true" : undefined}
+      data-drop-disabled={dragActive && !manualDropTarget ? "true" : undefined}
       role="region"
       aria-label={displayLabel}
     >
@@ -42,6 +46,7 @@ export function Column({ status, tickets, allTickets, runners, revision, onMove,
         <span>{String(tickets.length).padStart(2, "0")}</span>
       </header>
       <div className="column-cards">
+        {dragActive && manualDropTarget && <div className="column-drop-hint" data-over={droppable.isOver || undefined}>{droppable.isOver ? "Release to move" : "Drop ticket here"}</div>}
         {tickets.map(ticket => (
           <TicketCard
             key={ticket.id}

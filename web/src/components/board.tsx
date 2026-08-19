@@ -1,4 +1,17 @@
-import { DndContext, PointerSensor, useSensor, useSensors, type DragEndEvent } from "@dnd-kit/core";
+import { useState } from "react";
+import {
+  closestCenter,
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  pointerWithin,
+  useSensor,
+  useSensors,
+  type CollisionDetection,
+  type DragEndEvent,
+  type DragStartEvent
+} from "@dnd-kit/core";
 
 import type { ProjectConfig, Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
@@ -13,10 +26,19 @@ export type BoardProps = {
 };
 
 export function Board({ project, runners, onMove, onOpenTicket, compactCards = false }: BoardProps) {
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const [activeTicketId, setActiveTicketId] = useState<string | null>(null);
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor)
+  );
+  const handleDragStart = (event: DragStartEvent) => {
+    const ticket = project.board.tickets.find(candidate => candidate.id === event.active.id);
+    setActiveTicketId(ticket && isHumanMovable(ticket.status) ? ticket.id : null);
+  };
   const handleDragEnd = (event: DragEndEvent) => {
+    setActiveTicketId(null);
     const status = event.over?.id;
-    if (typeof status !== "string" || !project.board.columns.includes(status as TicketStatus)) return;
+    if (typeof status !== "string" || !project.board.columns.includes(status as TicketStatus) || !isManualDropTarget(status as TicketStatus)) return;
     const ticket = project.board.tickets.find(candidate => candidate.id === event.active.id);
     if (!ticket || !isHumanMovable(ticket.status) || ticket.status === status) return;
     void onMove(ticket.id, status as TicketStatus, project.board.revision);
@@ -30,8 +52,9 @@ export function Board({ project, runners, onMove, onOpenTicket, compactCards = f
     result.push({ status, tickets: project.board.tickets.filter(ticket => ticket.status === status) });
     return result;
   }, []);
+  const activeTicket = project.board.tickets.find(ticket => ticket.id === activeTicketId);
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext sensors={sensors} collisionDetection={magneticCollisionDetection} onDragStart={handleDragStart} onDragCancel={() => setActiveTicketId(null)} onDragEnd={handleDragEnd}>
       <div className="board-scroll" aria-label="Project delivery board">
         <div className="board-grid">
           {columns.map(column => (
@@ -46,14 +69,38 @@ export function Board({ project, runners, onMove, onOpenTicket, compactCards = f
               onMove={onMove}
               onOpenTicket={onOpenTicket}
               compactCards={compactCards}
+              dragActive={Boolean(activeTicket)}
+              manualDropTarget={isManualDropTarget(column.status)}
             />
           ))}
         </div>
       </div>
+      <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(.2,.8,.2,1)" }}>
+        {activeTicket ? <TicketDragPreview ticket={activeTicket} /> : null}
+      </DragOverlay>
     </DndContext>
   );
 }
 
 function isHumanMovable(status: TicketStatus): boolean {
   return status === "backlog" || status === "blocked";
+}
+
+function isManualDropTarget(status: TicketStatus): boolean {
+  return status === "backlog" || status === "todo" || status === "blocked";
+}
+
+const magneticCollisionDetection: CollisionDetection = arguments_ => {
+  const pointer = pointerWithin(arguments_);
+  return pointer.length > 0 ? pointer : closestCenter(arguments_);
+};
+
+function TicketDragPreview({ ticket }: { ticket: Ticket }) {
+  return (
+    <div className="ticket-drag-preview">
+      <span>{ticket.id}</span>
+      <strong>{ticket.title}</strong>
+      <small>Move to Backlog, Todo, or Blocked</small>
+    </div>
+  );
 }

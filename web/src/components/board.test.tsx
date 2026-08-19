@@ -29,4 +29,24 @@ describe("Board", () => {
     fireEvent.click(screen.getByRole("button", { name: "Open Build authentication" }));
     expect(onOpenTicket).toHaveBeenCalledWith("auth");
   });
+
+  it("marks only safe human workflow destinations as droppable", () => {
+    render(<Board project={projectFixture()} runners={[]} onMove={vi.fn()} onOpenTicket={vi.fn()} />);
+
+    expect(screen.getByRole("region", { name: "Backlog" })).toHaveAttribute("data-manual-drop-target", "true");
+    expect(screen.getByRole("region", { name: "Todo" })).toHaveAttribute("data-manual-drop-target", "true");
+    expect(screen.getByRole("region", { name: "Blocked" })).toHaveAttribute("data-manual-drop-target", "true");
+    expect(screen.getByRole("region", { name: "In progress" })).not.toHaveAttribute("data-manual-drop-target");
+    expect(screen.getByRole("region", { name: "Review & QA" })).not.toHaveAttribute("data-manual-drop-target");
+  });
+
+  it("reveals destination hints when a ticket drag starts", async () => {
+    render(<Board project={projectFixture()} runners={[]} onMove={vi.fn()} onOpenTicket={vi.fn()} />);
+    const handle = screen.getByRole("button", { name: "Drag Build authentication" });
+    handle.focus();
+
+    fireEvent.keyDown(handle, { key: " ", code: "Space" });
+
+    expect((await screen.findAllByText("Drop ticket here")).length).toBeGreaterThan(0);
+  });
 });
