@@ -50,7 +50,13 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     tmux: automation.tmux,
     runtimeFor: project => automation.runtimeFor(project)
   });
-  const mcpTools = new McpTools({ registry, events, runners: automation, donna });
+  const mcpTools = new McpTools({
+    registry,
+    events,
+    runners: automation,
+    donna,
+    isTicketMerged: (projectId, ticketId) => automation.deliveries(projectId)[ticketId]?.mergeState === "merged"
+  });
   const publicAccessToken = options.enablePublicTunnel ? randomBytes(24).toString("base64url") : undefined;
   const app = createApp({
     registry,

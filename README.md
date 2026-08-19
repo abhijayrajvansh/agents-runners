@@ -4,7 +4,7 @@ Codex Runners is a macOS-first personal Codex plugin for skill-driven autonomous
 
 The plugin bundles Matt Pocock's composable engineering skills under `skills/` and wires them as the workflow: `/grill-with-docs` to settle a plan and build the domain glossary, `/to-spec` to record a spec, `/to-tickets` to cut tracer-bullet vertical-slice tickets with blocking edges, `/implement` to build one ticket per fresh session, and `/code-review` to check the diff against the originating spec. `/triage` routes inbound issues, and `/wayfinder` charts efforts too large for one session into decision tickets.
 
-Planning and triage (`backlog`, `needs_triage`, `needs_info`, `ready_for_human`, `wontfix`) are inert. An issue is fully specified and ready by the time it reaches `ready_for_agent`; moving it there starts autonomous delivery. It progresses through implement, review, and verification, merges through one serialized integration lane, pushes the configured `dev` branch, and lands in Done.
+Backlog is a passive place for ideas. Donna and the `/to-tickets` flow create actionable work in Todo, where autonomous delivery starts. Tickets progress through In Progress, QA, and Review. Review is the final human stage: a person clicks Merge to integrate the delivery worktree branch into the configured integration branch. There is no Done status and no automatic merge.
 
 ## Requirements
 

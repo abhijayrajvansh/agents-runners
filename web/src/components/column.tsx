@@ -7,17 +7,11 @@ import { TicketCard } from "./ticket-card.js";
 
 const labels: Record<TicketStatus, string> = {
   backlog: "Backlog",
-  needs_triage: "Needs triage",
-  needs_info: "Needs info",
-  ready_for_agent: "Ready for agent",
-  ready_for_human: "Ready for human",
-  wontfix: "Won't fix",
   todo: "Todo",
   in_progress: "In progress",
-  review: "Review",
   qa: "QA",
-  blocked: "Blocked",
-  done: "Done"
+  review: "Review",
+  blocked: "Blocked"
 };
 
 export type ColumnProps = {
@@ -65,7 +59,10 @@ export function Column({ status, tickets, allTickets, runners, revision, onMove,
             onMove={onMove}
             onOpen={onOpenTicket}
             compact={compactCards}
-            blockerKind={ticket.dependencies.some(id => allTickets.find(candidate => candidate.id === id)?.status !== "done") ? "dependency" : "human_input"}
+            blockerKind={ticket.dependencies.some(id => {
+              const dependency = allTickets.find(candidate => candidate.id === id);
+              return dependency && deliveries[dependency.id]?.mergeState !== "merged";
+            }) ? "dependency" : "human_input"}
             delivery={deliveries[ticket.id]}
             onMerge={onMerge}
             mergeBranch={mergeBranch}

@@ -102,7 +102,7 @@ export class Scheduler {
       const prepared: Array<{ ticket: Ticket; runner: RunnerRecord; pool: RunnerPool }> = [];
       for (const assignment of assignments) {
         let ticket = assignment.ticket;
-        if (ticket.status === "todo" || ticket.status === "ready_for_agent") {
+        if (ticket.status === "todo") {
           const currentBoard = this.dependencies.registry.getBoard(projectId);
           const moved = await this.dependencies.registry.updateTicket(
             projectId,
@@ -193,7 +193,7 @@ export class Scheduler {
       }
       runtime.mergeState = "ready";
       delete runtime.mergeError;
-      status = "done";
+      status = "review";
     } else {
       if (result.kind === "failed") runtime.attempts += 1;
       runtime.findings = result.findings;
@@ -209,7 +209,9 @@ export class Scheduler {
         : runner.branch;
     }
     this.dependencies.runtime.setTicket(projectId, ticket.id, runtime);
-    const blocker = status === "blocked" ? blockerForResult(currentProject, ticket, result) : null;
+    const blocker = status === "blocked"
+      ? blockerForResult(currentProject, ticket, this.dependencies.runtime, result)
+      : null;
     await this.#updateTicket(projectId, ticket.id, { status, blocker });
     return status;
   }
@@ -317,8 +319,13 @@ export class Scheduler {
   }
 }
 
-function blockerForResult(project: ProjectConfig, ticket: Ticket, result: StageExecutionResult): NonNullable<Ticket["blocker"]> {
-  const done = new Set(project.board.tickets.filter(candidate => candidate.status === "done").map(candidate => candidate.id));
+function blockerForResult(
+  project: ProjectConfig,
+  ticket: Ticket,
+  runtime: ProjectRuntimeRepository,
+  result: StageExecutionResult
+): NonNullable<Ticket["blocker"]> {
+  const done = completedTicketIds(project, runtime);
   const unfinished = ticket.dependencies.filter(dependency => !done.has(dependency));
   if (unfinished.length > 0) {
     const names = unfinished.map(id => project.board.tickets.find(candidate => candidate.id === id)?.title ?? id);
@@ -349,15 +356,12 @@ function eligibleTickets(project: ProjectConfig, runtime: ProjectRuntimeReposito
 
 function completedTicketIds(project: ProjectConfig, runtime: ProjectRuntimeRepository): Set<string> {
   return new Set(project.board.tickets.filter(ticket => {
-    if (ticket.status !== "done") return false;
-    const mergeState = runtime.getTicket(project.project.id, ticket.id).mergeState;
-    return mergeState !== "ready" && mergeState !== "merging" && mergeState !== "failed";
+    return runtime.getTicket(project.project.id, ticket.id).mergeState === "merged";
   }).map(ticket => ticket.id));
 }
 
 function roleForStatus(status: TicketStatus): RoleName | null {
-  if (status === "todo" || status === "ready_for_agent" || status === "in_progress") return "developer";
-  if (status === "review") return "reviewer";
+  if (status === "todo" || status === "in_progress") return "developer";
   if (status === "qa") return "qa";
   return null;
 }

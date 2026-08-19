@@ -39,6 +39,7 @@ export type McpToolsDependencies = {
   events: EventBus;
   runners: RunnerDirectory;
   donna: DonnaMessenger;
+  isTicketMerged?(projectId: string, ticketId: string): boolean;
 };
 
 export class McpTools {
@@ -119,11 +120,12 @@ export class McpTools {
   async #claimNext(projectId: string, input: Record<string, unknown>): Promise<unknown> {
     const board = this.dependencies.registry.getBoard(projectId);
     assertRevision(board.revision, revisionInput(input));
-    const done = new Set(board.tickets.filter(ticket => ticket.status === "done").map(ticket => ticket.id));
     const ticket = board.tickets.find(candidate => (
-      ["ready_for_agent", "todo", "in_progress"].includes(candidate.status) &&
+      ["todo", "in_progress"].includes(candidate.status) &&
       !candidate.assignedRunnerId &&
-      candidate.dependencies.every(dependency => done.has(dependency))
+      candidate.dependencies.every(dependency => {
+        return this.dependencies.isTicketMerged?.(projectId, dependency) ?? false;
+      })
     ));
     if (!ticket) return { revision: board.revision, ticket: null };
     return this.dependencies.registry.updateTicket(
@@ -181,7 +183,7 @@ function revisionInput(input: Record<string, unknown>): number {
 
 function statusInput(input: Record<string, unknown>): TicketStatus {
   const status = stringInput(input, "status");
-  if (!["backlog", "needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix", "todo", "in_progress", "review", "qa", "blocked", "done"].includes(status)) {
+  if (!["backlog", "todo", "in_progress", "qa", "review", "blocked"].includes(status)) {
     throw new Error(`Unknown ticket status ${status}`);
   }
   return status as TicketStatus;

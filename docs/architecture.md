@@ -1,6 +1,6 @@
 # Architecture
 
-Codex Runners uses one loopback Node.js daemon for every initialized local project. Work is modelled as skill-flow issues: planning and triage produce fully-specified `ready_for_agent` issues (or wayfinder decision tickets for un-specable efforts), and the delivery engine below implements them one vertical slice at a time with persistent Codex runners.
+Codex Runners uses one loopback Node.js daemon for every initialized local project. Work is modelled as skill-flow tickets: planning produces passive backlog ideas, while Donna and `/to-tickets` produce fully-specified Todo tickets. The delivery engine implements them one vertical slice at a time with persistent Codex runners.
 
 ```text
 Codex CLI / Browser / Terminal
@@ -28,14 +28,14 @@ Codex CLI / Browser / Terminal
 
 ## Ticket delivery
 
-The scheduler serializes reconciliation per project while allowing independent runner stages to execute concurrently within role caps. Dependencies must be Done before a ticket is eligible.
+The scheduler serializes reconciliation per project while allowing independent runner stages to execute concurrently within role caps. Dependencies must be merged before a ticket is eligible.
 
 1. Todo claims a Developer and moves to In Progress.
 2. A clean persistent developer branch synchronizes with the integration branch. Codex implements, verifies, commits, and leaves the worktree clean.
 3. Review inspects the exact developer candidate without editing it.
 4. QA validates the same candidate, using Computer Use when configured.
 5. Failures return to the original developer thread. Retry exhaustion moves the ticket to Blocked.
-6. A QA pass enters the serialized integration lane, runs configured verification, pushes `dev`, and moves the ticket to Done.
+6. A QA pass seals the candidate and moves the ticket to Review. A human-only Merge action enters the serialized integration lane, merges the delivery branch into the configured integration branch, and marks the delivery as merged.
 
 Role worktrees and thread IDs remain intact when Idle. Managed reviewer and QA worktrees may point exactly at different candidate branches between tickets; user worktrees are never changed.
 
@@ -49,5 +49,5 @@ Donna owns one persistent Codex thread per project. Browser, terminal, and MCP m
 - tmux owns long-lived logical runner panes; individual `codex exec --json` turns may exit while the runner remains Idle.
 - Codex JSONL events are tailed during execution, normalized, redacted, and published to local clients.
 - Development environment values are copied without display and filtered from structured outputs.
-- Only the integrator can push the configured integration branch.
+- Only the human Review action can start integration; the integrator alone can push the configured integration branch.
 - Shutdown releases the daemon lock but preserves project runtime, worktrees, branches, panes, and Codex threads.

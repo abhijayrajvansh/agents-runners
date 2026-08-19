@@ -19,7 +19,50 @@ describe("ProjectConfigSchema", () => {
     expect(parsed.pools.reviewer.max).toBe(5);
     expect(parsed.pools.qa.max).toBe(5);
     expect(parsed.automation.maxRetries).toBe(3);
-    expect(parsed.automation.actionableStatuses).toEqual(["ready_for_agent", "todo", "in_progress", "review", "qa"]);
+    expect(parsed.board.columns).toEqual(["backlog", "todo", "in_progress", "qa", "review", "blocked"]);
+    expect(parsed.automation.actionableStatuses).toEqual(["todo", "in_progress", "qa"]);
+  });
+
+  it("normalizes legacy workflow statuses before strict validation", () => {
+    const parsed = ProjectConfigSchema.parse({
+      version: 1,
+      project: {
+        id: "demo",
+        name: "Demo",
+        repositoryRoot: "/tmp/demo",
+        integrationBranch: "dev"
+      },
+      donna: {
+        model: "gpt-5.6-luna",
+        reasoningEffort: "low",
+        timeoutMs: 180000
+      },
+      board: {
+        revision: 4,
+        columns: ["backlog", "needs_triage", "ready_for_agent", "in_progress", "review", "qa", "blocked", "done"],
+        tickets: [{
+          id: "ticket-1",
+          title: "Legacy work",
+          status: "done",
+          comments: [{
+            id: "comment-1",
+            author: "Donna",
+            body: "Keep this context.",
+            createdAt: "2026-08-18T12:00:00.000Z"
+          }],
+          createdAt: "2026-08-18T12:00:00.000Z",
+          updatedAt: "2026-08-18T12:00:00.000Z"
+        }]
+      },
+      automation: {
+        actionableStatuses: ["ready_for_agent", "todo", "in_progress", "review", "qa"]
+      }
+    });
+
+    expect(parsed.board.columns).toEqual(["backlog", "todo", "in_progress", "qa", "review", "blocked"]);
+    expect(parsed.board.tickets[0]?.status).toBe("review");
+    expect(parsed.board.tickets[0]?.comments[0]?.body).toBe("Keep this context.");
+    expect(parsed.automation.actionableStatuses).toEqual(["todo", "in_progress", "qa"]);
   });
 
   it("rejects a ticket status outside the configured workflow", () => {

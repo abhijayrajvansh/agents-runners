@@ -2,17 +2,11 @@ import { z } from "zod";
 
 export const TicketStatusSchema = z.enum([
   "backlog",
-  "needs_triage",
-  "needs_info",
-  "ready_for_agent",
-  "ready_for_human",
-  "wontfix",
   "todo",
   "in_progress",
-  "review",
   "qa",
-  "blocked",
-  "done"
+  "review",
+  "blocked"
 ]);
 
 export const RoleNameSchema = z.enum(["developer", "reviewer", "qa"]);
@@ -57,7 +51,6 @@ export const TicketSchema = z.object({
   kind: TicketKindSchema.default("ticket"),
   source: TicketSourceSchema.default("manual"),
   category: z.enum(["bug", "enhancement"]).optional(),
-  triageState: z.enum(["needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix"]).optional(),
   description: z.string().default(""),
   acceptanceCriteria: z.array(z.string()).default([]),
   status: TicketStatusSchema,
@@ -83,12 +76,76 @@ const RolePoolSchema = z.object({
   instructions: z.string().default("")
 }).strict();
 
-const defaultColumns = ["backlog", "needs_triage", "ready_for_agent", "in_progress", "review", "qa", "blocked", "done"] as const;
-// Skill-flow work reaches the runner as `ready_for_agent` (from /triage or
-// /to-tickets) and then moves through the delivery statuses.
-const actionableStatuses = ["ready_for_agent", "todo", "in_progress", "review", "qa"] as const;
+const defaultColumns = ["backlog", "todo", "in_progress", "qa", "review", "blocked"] as const;
+const actionableStatuses = ["todo", "in_progress", "qa"] as const;
 
-export const ProjectConfigSchema = z.object({
+const legacyStatusMap: Record<string, z.infer<typeof TicketStatusSchema>> = {
+  needs_triage: "backlog",
+  needs_info: "backlog",
+  ready_for_human: "backlog",
+  wontfix: "backlog",
+  ready_for_agent: "todo",
+  done: "review"
+};
+
+export function normalizeProjectConfigInput(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const source = value as Record<string, unknown>;
+  const board = source.board && typeof source.board === "object" && !Array.isArray(source.board)
+    ? source.board as Record<string, unknown>
+    : undefined;
+  const automation = source.automation && typeof source.automation === "object" && !Array.isArray(source.automation)
+    ? source.automation as Record<string, unknown>
+    : undefined;
+  const tickets = Array.isArray(board?.tickets)
+    ? board.tickets.map(ticket => normalizeTicketInput(ticket))
+    : board?.tickets;
+  return {
+    ...source,
+    ...(board ? {
+      board: {
+        ...board,
+        ...(Array.isArray(board.columns) ? { columns: normalizeColumns(board.columns) } : {}),
+        ...(Array.isArray(tickets) ? { tickets } : {})
+      }
+    } : {}),
+    ...(automation ? {
+      automation: {
+        ...automation,
+        ...(Array.isArray(automation.actionableStatuses)
+          ? { actionableStatuses: normalizeStatuses(automation.actionableStatuses).filter(status => actionableStatuses.includes(status as typeof actionableStatuses[number])) }
+          : {})
+      }
+    } : {})
+  };
+}
+
+function normalizeTicketInput(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const ticket = value as Record<string, unknown>;
+  const { triageState: _triageState, ...withoutTriage } = ticket;
+  return {
+    ...withoutTriage,
+    ...(typeof ticket.status === "string" ? { status: normalizeStatus(ticket.status) } : {})
+  };
+}
+
+function normalizeStatuses(values: unknown[]): string[] {
+  return [...new Set(values
+    .filter((value): value is string => typeof value === "string")
+    .map(normalizeStatus))];
+}
+
+function normalizeColumns(values: unknown[]): string[] {
+  const normalized = new Set(normalizeStatuses(values));
+  return defaultColumns.filter(status => normalized.has(status));
+}
+
+function normalizeStatus(value: string): string {
+  return legacyStatusMap[value] ?? value;
+}
+
+const ProjectConfigObjectSchema = z.object({
   version: z.literal(1),
   project: z.object({
     id: z.string().min(1),
@@ -176,6 +233,8 @@ export const ProjectConfigSchema = z.object({
     return { createdAt: now, updatedAt: now };
   })
 }).strict();
+
+export const ProjectConfigSchema = z.preprocess(normalizeProjectConfigInput, ProjectConfigObjectSchema);
 
 export type TicketStatus = z.infer<typeof TicketStatusSchema>;
 export type RoleName = z.infer<typeof RoleNameSchema>;

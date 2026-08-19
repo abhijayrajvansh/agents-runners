@@ -41,8 +41,12 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const sequence = useRef(0);
+  const lastSocketEventAt = useRef(0);
+  const refreshing = useRef(false);
 
   const refresh = useCallback(async () => {
+    if (refreshing.current) return;
+    refreshing.current = true;
     try {
       const [nextProject, nextRunners, nextDonnaMessages, nextModels, nextDeliveries] = await Promise.all([
         api.getProject(projectId),
@@ -61,22 +65,35 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
       setLoading(false);
+      refreshing.current = false;
     }
   }, [api, projectId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
-  useEffect(() => connectProjectSocket(projectId, sequence.current, event => {
-    sequence.current = Math.max(sequence.current, event.sequence);
-    setActivity(current => [...current, event].slice(-80));
-    if (event.type === "config.error" && typeof event.payload.message === "string") setError(event.payload.message);
-    if (event.type === "donna.user" || event.type === "donna.completed" || event.type === "donna.blocker") {
-      void api.getDonnaMessages(projectId).then(setDonnaMessages);
-    }
-    if (event.type.startsWith("ticket.") || event.type.startsWith("runner.") || event.type === "project.updated") {
-      void refresh();
-    }
-  }, setConnected), [api, projectId, refresh]);
+  useEffect(() => {
+    lastSocketEventAt.current = Date.now();
+    return connectProjectSocket(projectId, sequence.current, event => {
+      lastSocketEventAt.current = Date.now();
+      sequence.current = Math.max(sequence.current, event.sequence);
+      setActivity(current => [...current, event].slice(-80));
+      if (event.type === "config.error" && typeof event.payload.message === "string") setError(event.payload.message);
+      if (event.type === "donna.user" || event.type === "donna.completed" || event.type === "donna.blocker") {
+        void api.getDonnaMessages(projectId).then(setDonnaMessages);
+      }
+      if (event.type.startsWith("ticket.") || event.type.startsWith("runner.") || event.type === "project.updated") {
+        void refresh();
+      }
+    }, setConnected);
+  }, [api, projectId, refresh]);
+
+  useEffect(() => {
+    const poll = setInterval(() => {
+      const stale = Date.now() - lastSocketEventAt.current > 5_000;
+      if (!connected || stale) void refresh();
+    }, 2_000);
+    return () => clearInterval(poll);
+  }, [connected, refresh]);
 
   const moveTicket = useCallback(async (ticketId: string, status: TicketStatus, expectedRevision: number) => {
     const snapshot = project;
@@ -144,7 +161,11 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
       setError(caught instanceof Error ? caught.message : String(caught));
       throw caught;
     } finally {
-      setDonnaMessages(await api.getDonnaMessages(projectId));
+      try {
+        setDonnaMessages(await api.getDonnaMessages(projectId));
+      } catch {
+        // Preserve the original chat error and let polling recover the persisted history.
+      }
     }
   }, [api, projectId]);
 

@@ -84,11 +84,11 @@ export function Board({ project, runners, onMove, onOpenTicket, compactCards = f
 }
 
 function isHumanMovable(status: TicketStatus): boolean {
-  return ["backlog", "needs_triage", "needs_info", "ready_for_human", "wontfix", "blocked"].includes(status);
+  return ["backlog", "blocked"].includes(status);
 }
 
 function isManualDropTarget(status: TicketStatus): boolean {
-  return ["backlog", "needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix", "blocked"].includes(status);
+  return ["backlog", "blocked"].includes(status);
 }
 
 const magneticCollisionDetection: CollisionDetection = arguments_ => {
@@ -101,7 +101,7 @@ function TicketDragPreview({ ticket }: { ticket: Ticket }) {
     <div className="ticket-drag-preview">
       <span>{ticket.id}</span>
       <strong>{ticket.title}</strong>
-      <small>Move through triage or to Ready for agent</small>
+      <small>Move passive work to Todo when you are ready to start it</small>
     </div>
   );
 }

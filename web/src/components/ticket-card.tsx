@@ -8,29 +8,19 @@ import type { TicketDeliveryState } from "../../../src/runtime/project-runtime.j
 
 const nextStatus: Partial<Record<TicketStatus, TicketStatus>> = {
   backlog: "todo",
-  needs_triage: "ready_for_agent",
-  needs_info: "needs_triage",
   todo: "in_progress",
-  in_progress: "review",
-  review: "qa",
-  qa: "done",
-  blocked: "ready_for_agent",
-  ready_for_human: "ready_for_agent"
+  in_progress: "qa",
+  qa: "review",
+  blocked: "todo"
 };
 
 const statusLabels: Record<TicketStatus, string> = {
   backlog: "Backlog",
-  needs_triage: "Needs triage",
-  needs_info: "Needs info",
-  ready_for_agent: "Ready for agent",
-  ready_for_human: "Ready for human",
-  wontfix: "Won't fix",
   todo: "Todo",
   in_progress: "In progress",
-  review: "Review",
   qa: "QA",
-  blocked: "Blocked",
-  done: "Done"
+  review: "Review",
+  blocked: "Blocked"
 };
 
 export type TicketCardProps = {
@@ -47,7 +37,7 @@ export type TicketCardProps = {
 };
 
 export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, blockerKind, delivery, onMerge, mergeBranch }: TicketCardProps) {
-  const humanMovable = ["backlog", "needs_triage", "needs_info", "ready_for_human", "wontfix", "blocked"].includes(ticket.status);
+  const humanMovable = ["backlog", "blocked"].includes(ticket.status);
   const draggable = useDraggable({ id: ticket.id, data: { ticket }, disabled: !humanMovable });
   const upcoming = humanMovable ? nextStatus[ticket.status] : undefined;
   const style = {
@@ -117,20 +107,20 @@ export function TicketCard({ ticket, runner, revision, onMove, onOpen, compact, 
           {statusLabels[upcoming]} <ArrowRight size={13} />
         </button>
       )}
-      {ticket.status === "done" && delivery?.mergeState === "ready" && (
+      {ticket.status === "review" && delivery?.mergeState === "ready" && (
         <button type="button" className="ticket-merge" onClick={() => void onMerge(ticket.id)}>
           <GitMerge size={13} /> Merge to {mergeBranch}
         </button>
       )}
-      {ticket.status === "done" && delivery?.mergeState === "merging" && (
+      {ticket.status === "review" && delivery?.mergeState === "merging" && (
         <button type="button" className="ticket-merge" disabled><LoaderCircle className="spin" size={13} /> Merging…</button>
       )}
-      {ticket.status === "done" && delivery?.mergeState === "failed" && (
+      {ticket.status === "review" && delivery?.mergeState === "failed" && (
         <button type="button" className="ticket-merge ticket-merge--retry" title={delivery.mergeError} onClick={() => void onMerge(ticket.id)}>
           <RotateCcw size={13} /> Retry merge
         </button>
       )}
-      {ticket.status === "done" && delivery?.mergeState === "merged" && (
+      {ticket.status === "review" && delivery?.mergeState === "merged" && (
         <div className="ticket-merged"><Check size={13} /> Merged</div>
       )}
     </article>

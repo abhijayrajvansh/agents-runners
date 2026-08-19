@@ -22,6 +22,27 @@ type ProjectAutomation = {
   heartbeat: ReturnType<typeof setInterval>;
 };
 
+export type HeartbeatStatus = { ok: true } | { ok: false; error: string };
+
+export function createGuardedHeartbeat(
+  reconcile: () => Promise<void>,
+  onStatus: (status: HeartbeatStatus) => void
+): () => Promise<void> {
+  let inFlight = false;
+  return async () => {
+    if (inFlight) return;
+    inFlight = true;
+    try {
+      await reconcile();
+      onStatus({ ok: true });
+    } catch (error) {
+      onStatus({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      inFlight = false;
+    }
+  };
+}
+
 export type AgentTerminalSnapshot = {
   id: string;
   role: "donna" | RoleName;
@@ -43,6 +64,7 @@ export class AutomationManager {
   readonly integration: IntegrationService;
   #projects = new Map<string, ProjectAutomation>();
   #merges = new Map<string, Promise<TicketDeliveryState>>();
+  #heartbeatRunners = new Map<string, () => Promise<void>>();
 
   constructor(registry: ProjectRegistry, events: EventBus, options: { codexCommand?: string } = {}) {
     this.registry = registry;
@@ -111,10 +133,25 @@ export class AutomationManager {
     const executor = new PreparedStageExecutor(this.worktrees, codexExecutor);
     const scheduler = new Scheduler({ registry: this.registry, events: this.events, runtime, pools, executor });
     const unsubscribe = this.events.subscribe(projectId, event => this.#handleEvent(projectId, event));
-    const heartbeat = setInterval(() => this.reconcile(projectId), 2_000);
+    const heartbeatRunner = createGuardedHeartbeat(
+      () => pools.size === 0 ? Promise.resolve() : scheduler.schedule(projectId),
+      status => {
+        this.events.publish({
+          type: "automation.heartbeat",
+          projectId,
+          revision: this.registry.getBoard(projectId).revision,
+          payload: {
+            ok: status.ok,
+            ...(status.ok ? {} : { error: status.error })
+          }
+        });
+      }
+    );
+    this.#heartbeatRunners.set(projectId, heartbeatRunner);
+    const heartbeat = setInterval(() => void heartbeatRunner(), 2_000);
     heartbeat.unref();
     this.#projects.set(projectId, { runtime, pools, scheduler, unsubscribe, heartbeat });
-    for (const ticket of config.board.tickets.filter(candidate => candidate.status === "done")) {
+    for (const ticket of config.board.tickets.filter(candidate => candidate.status === "review")) {
       const state = runtime.getTicket(projectId, ticket.id);
       if (state.mergeState !== "merging") continue;
       state.mergeState = "failed";
@@ -125,7 +162,7 @@ export class AutomationManager {
     for (const ticket of config.board.tickets.filter(candidate => candidate.status === "blocked")) {
       this.#notifyBlocker(projectId, ticket);
     }
-    this.reconcile(projectId);
+    void heartbeatRunner();
   }
 
   reconcile(projectId: string): void {
@@ -181,7 +218,7 @@ export class AutomationManager {
     if (!automation) throw new Error(`Automation runtime for ${projectId} is unavailable`);
     const ticket = this.registry.getBoard(projectId).tickets.find(candidate => candidate.id === ticketId);
     if (!ticket) throw new Error(`Ticket ${ticketId} was not found`);
-    if (!["ready_for_agent", "todo", "in_progress", "review", "qa"].includes(ticket.status)) {
+    if (!["todo", "in_progress", "qa"].includes(ticket.status)) {
       throw new Error(`${ticket.title} is not running and cannot be aborted`);
     }
     const result = await this.registry.updateTicket(projectId, ticketId, {
@@ -214,7 +251,7 @@ export class AutomationManager {
     const automation = this.#projects.get(projectId);
     if (!automation) throw new Error(`Automation runtime for ${projectId} is unavailable`);
     const state = automation.runtime.getTicket(projectId, ticketId);
-    if (ticket.status !== "done" || !["ready", "failed"].includes(state.mergeState ?? "") || !state.deliveryBranch || !state.developerRunnerId) {
+    if (ticket.status !== "review" || !["ready", "failed"].includes(state.mergeState ?? "") || !state.deliveryBranch || !state.developerRunnerId) {
       throw new Error(`${ticket.title} is not ready to merge`);
     }
     state.mergeState = "merging";
@@ -311,6 +348,7 @@ export class AutomationManager {
       project.unsubscribe();
       clearInterval(project.heartbeat);
     }
+    this.#heartbeatRunners.clear();
     this.#projects.clear();
   }
 
@@ -321,6 +359,7 @@ export class AutomationManager {
       clearInterval(automation.heartbeat);
     }
     this.#projects.delete(projectId);
+    this.#heartbeatRunners.delete(projectId);
     await this.tmux.killSession(sessionName(projectId)).catch(() => undefined);
   }
 
@@ -356,7 +395,7 @@ export class AutomationManager {
     const runtime = automation.runtime.getTicket(projectId, ticket.id);
     const message = automation.runtime.appendDonnaMessage(projectId, {
       author: "donna",
-      text: buildBlockerMessage(this.registry.get(projectId), ticket, runtime.findings),
+      text: buildBlockerMessage(this.registry.get(projectId), ticket, automation.runtime),
       source: "mcp"
     });
     automation.runtime.setBlockerNotification(projectId, ticket.id, ticket.updatedAt);
@@ -430,13 +469,13 @@ function stripTerminalControl(value: string): string {
     .replace(/\r/g, "");
 }
 
-function buildBlockerMessage(project: ProjectConfig, ticket: Ticket, findings: string[]): string {
+function buildBlockerMessage(project: ProjectConfig, ticket: Ticket, runtime: ProjectRuntimeRepository): string {
   const unfinishedDependencies = ticket.dependencies
     .map(id => project.board.tickets.find(candidate => candidate.id === id))
-    .filter(dependency => dependency?.status !== "done");
+    .filter(dependency => dependency && runtime.getTicket(project.project.id, dependency.id).mergeState !== "merged");
   const reason = readableBlockerReason(
     ticket.blocker?.reason
-      ?? findings.find(finding => finding.trim())
+      ?? runtime.getTicket(project.project.id, ticket.id).findings.find(finding => finding.trim())
       ?? ticket.comments.at(-1)?.body,
     "No technical blocker was recorded by the runner."
   );

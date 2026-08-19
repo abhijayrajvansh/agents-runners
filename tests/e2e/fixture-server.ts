@@ -25,11 +25,22 @@ const runners: RunnerRecord[] = (["developer", "reviewer", "qa"] as const).map((
   branch: `codex-runners/${role}-01`,
   tmuxTarget: `${project.project.id}:${role}-01`
 }));
+const deliveries: Record<string, { deliveryBranch: string; mergeState: "ready" | "merged" }> = {};
 const automation = {
   list: () => runners,
-  get: (_projectId: string, runnerId: string) => runners.find(runner => runner.id === runnerId)
-} as Pick<AutomationManager, "list" | "get">;
+  get: (_projectId: string, runnerId: string) => runners.find(runner => runner.id === runnerId),
+  deliveries: () => deliveries,
+  mergeTicket: async (_projectId: string, ticketId: string) => {
+    const delivery = deliveries[ticketId];
+    if (!delivery) throw new Error("Ticket is not ready to merge");
+    delivery.mergeState = "merged";
+    return delivery;
+  }
+} as Pick<AutomationManager, "list" | "get"> & Partial<Pick<AutomationManager, "deliveries" | "mergeTicket">>;
 const donna = {
+  history() {
+    return [];
+  },
   async *send(projectId: string) {
     yield { type: "message" as const, projectId, text: "I’ll coordinate that with the runner team." };
     yield { type: "completed" as const, projectId, message: "I’ll coordinate that with the runner team." };
@@ -63,9 +74,8 @@ server.listen(4788, "127.0.0.1");
 async function deliver(ticketId: string): Promise<void> {
   for (const [status, role] of [
     ["in_progress", "developer"],
-    ["review", "reviewer"],
     ["qa", "qa"],
-    ["done", null]
+    ["review", null]
   ] as const) {
     for (const runner of runners) {
       runner.status = runner.role === role ? "working" : "idle";
@@ -80,6 +90,9 @@ async function deliver(ticketId: string): Promise<void> {
     });
     await new Promise(resolve => setTimeout(resolve, 120));
     const board = registry.getBoard(project.project.id);
+    if (status === "review") {
+      deliveries[ticketId] = { deliveryBranch: "codex-runners/developer-01", mergeState: "ready" };
+    }
     await registry.updateTicket(project.project.id, ticketId, { status }, board.revision);
   }
 }

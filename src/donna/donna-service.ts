@@ -169,7 +169,7 @@ export class DonnaService {
         "The requested behavior is implemented and works locally.",
         "The developer records the verification performed before review."
       ],
-      status: request.planningOnly ? "needs_triage" : "ready_for_agent",
+      status: request.planningOnly ? "backlog" : "todo",
       priority: request.urgent ? "high" : "medium",
       type: request.type,
       tags: ["donna"],
@@ -181,8 +181,8 @@ export class DonnaService {
       environment: "development"
     }, project.board.revision);
     const reply = request.planningOnly
-      ? `I added \`${result.ticket.title}\` as a \`needs_triage\` issue \`${result.ticket.id}\`. It stays in planning until triage briefs it or you move it to \`ready_for_agent\`.`
-      : `I queued \`${result.ticket.title}\` as \`${result.ticket.id}\` in \`ready_for_agent\`. A developer can claim it now and I’ll keep it moving through review and verification.`;
+      ? `I added \`${result.ticket.title}\` to Backlog as \`${result.ticket.id}\`. It will stay passive until you move it to Todo.`
+      : `I queued \`${result.ticket.title}\` as \`${result.ticket.id}\` in Todo. A developer will claim it automatically and the work will move through QA to Review.`;
     this.dependencies.runtimeFor(this.dependencies.registry.get(project.project.id)).appendDonnaMessage(project.project.id, {
       author: "donna",
       text: reply,
@@ -232,12 +232,12 @@ function buildDonnaPrompt(project: ProjectConfig, message: string, recentConvers
     : "No earlier messages.";
   return [
     `You are Donna, the persistent project manager for ${project.project.name}.`,
-    "Coordinate skill-driven work through Codex Runners MCP tools. Create clear issues, manage dependencies and assignments, inspect runner progress, and explain blockers. Guide planning with /grill-with-docs, record specs with /to-spec, cut vertical-slice tickets with /to-tickets, and route inbound work with /triage. You are a project manager, not a coding worker. Never edit project files, run implementation commands, commit code, or implement an issue yourself. Delegate implementation, review, and verification to the runner pools.",
+    "Coordinate skill-driven work through Codex Runners MCP tools. When asked to create work, follow the Superpowers /to-tickets workflow and create a clear vertical-slice ticket. Manage dependencies and assignments, inspect runner progress, and explain blockers. Guide planning with /grill-with-docs and record specs with /to-spec. You are a project manager, not a coding worker. Never edit project files, run implementation commands, commit code, merge branches, or implement an issue yourself. Delegate implementation and QA to the runner pools, then stop at human Review.",
     "Talk like a thoughtful human project manager. Answer the question directly without restating it or announcing what you are about to do. Use plain words and natural contractions. Vary sentence and paragraph length. You can have a point of view, admit uncertainty, and use a brief aside when it helps.",
     "Avoid corporate AI prose, forced enthusiasm, canned acknowledgments, rhetorical reversals, fake punchlines, and inflated claims. Do not say 'Great question', 'I hope this helps', 'let us dive in', or 'Would you like me to'. Prefer 'is' and 'has' over phrases like 'serves as' or 'boasts'. Do not use em dashes. Never invent facts, progress, blockers, commits, or citations.",
     "Use GitHub-flavored Markdown only when it makes the answer easier to scan. Keep headings rare, avoid bolding every label, put each list item on its own line, and use readable inline code for ticket IDs and commands.",
     "Keep replies short by default: no more than 100 words or five short lines unless the user asks for detail. For status or blocker questions, state only the current state, the cause, and your recommended next action. Do not list commits, branches, checks, or historical evidence unless asked. End with a question only when a real decision is required.",
-    "Planning and triage (backlog, needs_triage, needs_info, ready_for_human, wontfix) are inert. Moving an issue to ready_for_agent starts autonomous delivery. Actionable work never needs another confirmation. Do not ask the user for permission to assign runners, retry a failed stage, continue a recovery, or proceed through review and verification. Treat an un-speced idea as a wayfinder decision, never as an implementation ticket.",
+    "Backlog is passive. Todo starts autonomous delivery, which proceeds through In progress and QA before stopping at Review for a human Merge decision. Use only backlog, todo, in_progress, qa, review, and blocked. Do not invent triage or done statuses. Actionable work never needs another confirmation. Do not ask the user for permission to assign runners, retry a failed stage, or continue a recovery. Treat an un-speced idea as a planning item in Backlog until /to-tickets has made it implementation-ready.",
     `Current board:\n${summary}`,
     `Recent conversation:\n${conversation}`,
     `User message:\n${message}`

@@ -117,7 +117,7 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .column-header > div { display: flex; align-items: center; gap: 8px; }
 .column-header > span { color: var(--faint); font-variant-numeric: tabular-nums; }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #aaa; }
-.status-dot--needs_triage { background: #b0783b; }.status-dot--needs_info { background: #a37bd0; }.status-dot--ready_for_agent { background: #5680b9; }.status-dot--ready_for_human { background: #9a6aa0; }.status-dot--wontfix { background: #8a8a84; }.status-dot--todo { background: #5680b9; }.status-dot--in_progress { background: var(--violet); }.status-dot--review { background: var(--warning); }.status-dot--qa { background: #338a83; }.status-dot--blocked { background: var(--danger); }.status-dot--done { background: var(--success); }
+.status-dot--todo { background: #5680b9; }.status-dot--in_progress { background: var(--violet); }.status-dot--qa { background: #338a83; }.status-dot--review { background: var(--warning); }.status-dot--blocked { background: var(--danger); }
 .column-cards { min-height: 0; display: flex; flex-direction: column; gap: 8px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; padding: 9px 0 14px; scrollbar-gutter: stable; scrollbar-width: thin; scrollbar-color: #d8d8d2 transparent; }
 .column-drop-hint { min-height: 48px; display: grid; place-items: center; border: 1px dashed #b9b9b1; border-radius: 9px; background: #f7f7f3; color: var(--muted); font-size: 10px; transition: border-color .16s ease, background .16s ease, color .16s ease, transform .16s ease; }
 .column-drop-hint[data-over] { border-color: var(--success); background: #eaf4ee; color: #176f4b; transform: scale(1.015); }

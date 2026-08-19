@@ -17,7 +17,7 @@ const config = ProjectConfigSchema.parse({
   server: { host: "127.0.0.1", port: 4777, openBrowser: true },
   board: {
     revision: 1,
-    columns: ["backlog", "todo", "in_progress", "review", "qa", "blocked", "done"],
+    columns: ["backlog", "todo", "in_progress", "qa", "review", "blocked"],
     tickets: [{
       id: "schema",
       title: "Define project schema",

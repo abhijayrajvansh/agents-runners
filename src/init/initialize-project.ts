@@ -24,7 +24,7 @@ export type InitResult = {
 
 const agentsInstructions = `## Codex Runners
 
-When \`.codex-runners/config.json\` exists, use the Codex Runners MCP tools as the shared task source and the bundled Matt Pocock skills as the workflow. Donna is the persistent project manager. Triage and planning statuses are inactive; issues marked \`ready_for_agent\` are processed autonomously one vertical slice at a time. Prefer /grill-with-docs, /to-spec, /to-tickets, /implement, and /code-review over inventing a new process. Do not create unmanaged worker processes or remove persistent runner worktrees. Never print environment-file values into chat, logs, tickets, or commits.`;
+When \`.codex-runners/config.json\` exists, use the Codex Runners MCP tools as the shared task source and the bundled Matt Pocock skills as the workflow. Donna is the persistent project manager. Backlog is passive; moving work to \`todo\` starts autonomous delivery through \`in_progress\`, \`qa\`, and final human \`review\`. Use the Superpowers \`/to-tickets\` workflow for new vertical-slice tickets. Prefer /grill-with-docs, /to-spec, /to-tickets, /implement, and /code-review over inventing a new process. Do not create unmanaged worker processes or remove persistent runner worktrees. Never print environment-file values into chat, logs, tickets, or commits.`;
 
 async function readText(file: string, fallback = ""): Promise<string> {
   try {

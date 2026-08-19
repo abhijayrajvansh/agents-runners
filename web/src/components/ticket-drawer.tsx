@@ -4,18 +4,20 @@ import { LockKeyhole, OctagonX, X } from "lucide-react";
 import type { Ticket, TicketStatus } from "../../../src/domain/types.js";
 import { humanBlockerPrompt, readableBlockerReason } from "../../../src/orchestration/blockers.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
+import type { TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
 
 export type TicketDrawerProps = {
   open: boolean;
   ticket: Ticket | null;
   tickets: Ticket[];
   runners: RunnerRecord[];
+  deliveries: Record<string, TicketDeliveryState>;
   onClose(): void;
   onSave(ticket: Partial<Ticket> & { id?: string }): Promise<void>;
   onAbort(ticketId: string): Promise<void>;
 };
 
-export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, onAbort }: TicketDrawerProps) {
+export function TicketDrawer({ open, ticket, tickets, runners, deliveries, onClose, onSave, onAbort }: TicketDrawerProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TicketStatus>("backlog");
@@ -38,15 +40,15 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
   }, [ticket, open]);
 
   if (!open) return null;
-  const waitingForDependencies = Boolean(ticket?.dependencies.some(id => tickets.find(candidate => candidate.id === id)?.status !== "done"));
+  const waitingForDependencies = Boolean(ticket?.dependencies.some(id => deliveries[id]?.mergeState !== "merged"));
   const needsHumanInput = ticket?.status === "blocked" && (ticket.blocker?.kind ?? (waitingForDependencies ? "dependency" : "human_input")) === "human_input";
   const blockerReason = readableBlockerReason(ticket?.blocker?.reason);
   const blockerPrompt = humanBlockerPrompt(ticket?.title ?? title, blockerReason);
   const blockerQuestion = ticket?.blocker?.question ?? blockerPrompt.question;
   const recommendedAction = ticket?.blocker?.recommendedAction ?? blockerPrompt.example;
   const autoResumeAt = ticket?.blocker?.autoResumeAt;
-  const editable = !ticket || ["backlog", "needs_triage", "needs_info", "ready_for_agent", "ready_for_human", "wontfix", "blocked", "done"].includes(ticket.status);
-  const abortable = Boolean(ticket && ["ready_for_agent", "todo", "in_progress", "review", "qa"].includes(ticket.status));
+  const editable = !ticket || ["backlog", "blocked"].includes(ticket.status);
+  const abortable = Boolean(ticket && ["todo", "in_progress", "qa"].includes(ticket.status));
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!editable || !title.trim() || saving) return;
@@ -58,7 +60,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
         ...(ticket ? { id: ticket.id } : {}),
         title: title.trim(),
         description: description.trim(),
-        status: resume ? "ready_for_agent" : status,
+        status: resume ? "todo" : status,
         priority,
         acceptanceCriteria: acceptance.split("\n").map(value => value.trim()).filter(Boolean),
         ...(resume ? {
@@ -97,7 +99,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
           <label>Title<input autoFocus={editable} value={title} onChange={event => setTitle(event.target.value)} placeholder="What needs to be delivered?" /></label>
           <label>Description<textarea value={description} onChange={event => setDescription(event.target.value)} rows={5} placeholder="Give Donna and the runners useful context." /></label>
           <div className="form-row">
-            <label>Status<select value={status} onChange={event => setStatus(event.target.value as TicketStatus)}><option value="backlog">Backlog</option><option value="needs_triage">Needs triage</option><option value="needs_info">Needs info</option><option value="ready_for_agent">Ready for agent</option><option value="ready_for_human">Ready for human</option><option value="wontfix">Won’t fix</option><option value="todo">Todo — start automatically</option><option value="in_progress">In progress</option><option value="review">Review</option><option value="qa">QA</option><option value="blocked">Blocked</option><option value="done">Done</option></select></label>
+            <label>Status<select value={status} onChange={event => setStatus(event.target.value as TicketStatus)}><option value="backlog">Backlog</option><option value="todo">Todo — start automatically</option><option value="in_progress">In progress</option><option value="qa">QA</option><option value="review">Review</option><option value="blocked">Blocked</option></select></label>
             <label>Priority<select value={priority} onChange={event => setPriority(event.target.value as Ticket["priority"])}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="critical">Critical</option></select></label>
           </div>
           <label>Assign runner<select value={assignedRunnerId} onChange={event => setAssignedRunnerId(event.target.value)}><option value="">Automatic assignment</option>{runners.filter(runner => runner.role === "developer").map(runner => <option key={runner.id} value={runner.id}>{runner.id}</option>)}</select></label>

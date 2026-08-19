@@ -4,6 +4,7 @@ test("creates, starts, and autonomously completes a ticket with Donna available"
   const projects = await (await request.get("/api/projects")).json() as { projects: Array<{ id: string }> };
   const projectId = projects.projects[0]?.id;
   expect(projectId).toBeTruthy();
+  await page.addInitScript(() => localStorage.setItem("codex-runners:compact-cards", "false"));
   await page.goto(`/projects/${projectId}`);
 
   await page.keyboard.press("Meta+b");
@@ -20,7 +21,9 @@ test("creates, starts, and autonomously completes a ticket with Donna available"
   await expect(page.getByRole("region", { name: "Backlog" })).toContainText("Ship account recovery");
 
   await page.getByRole("button", { name: "Move Ship account recovery to Todo" }).click();
-  await expect(page.getByRole("region", { name: "Done" })).toContainText("Ship account recovery");
+  await expect(page.getByRole("region", { name: "Review" })).toContainText("Ship account recovery");
+  await page.getByRole("button", { name: /Merge to dev/ }).click();
+  await expect(page.getByText("Merged")).toBeVisible();
 
   await page.getByLabel("Message Donna").fill("Summarize the delivery");
   await page.getByRole("button", { name: "Send message" }).click();

@@ -109,8 +109,8 @@ export function App() {
           <div className="workspace-heading">
             <div><span className="eyebrow">Autonomous delivery</span><h1>{state.project.project.name}</h1></div>
             <div className="board-summary">
-              <span><strong>{state.project.board.tickets.filter(ticket => ticket.status !== "done").length}</strong> open</span>
-              <span><strong>{state.project.board.tickets.filter(ticket => ticket.status === "done").length}</strong> done</span>
+              <span><strong>{state.project.board.tickets.filter(ticket => ticket.status !== "review" || state.deliveries[ticket.id]?.mergeState !== "merged").length}</strong> open</span>
+              <span><strong>{state.project.board.tickets.filter(ticket => ticket.status === "review").length}</strong> review</span>
               <span><strong>{state.runners.filter(runner => runner.status === "working").length}</strong> active</span>
               <button
                 type="button"
@@ -160,6 +160,7 @@ export function App() {
         onClose={() => setDrawerOpen(false)}
         onSave={state.saveTicket}
         onAbort={state.abortTicket}
+        deliveries={state.deliveries}
       />
       <CommandPalette
         open={paletteOpen}

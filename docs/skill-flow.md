@@ -16,7 +16,7 @@ The bundled skills form one connected chain:
 - `/ask-matt` is the router: it reads the situation and points at the right skill or flow.
 - `/grill-with-docs` settles a plan and writes the domain glossary into `CONTEXT.md` plus ADRs into `docs/adr/`.
 - `/to-spec` records a settled conversation as a spec on the configured issue tracker.
-- `/to-tickets` cuts that spec into tracer-bullet vertical-slice tickets, each declaring its blocking edges on `dependencies`. Every ticket starts `ready_for_agent`.
+- `/to-tickets` cuts that spec into tracer-bullet vertical-slice tickets, each declaring its blocking edges on `dependencies`. Every ticket starts in `todo`.
 - `/implement` builds one ticket per fresh session, driving `/tdd` at the agreed seam and closing with `/code-review`.
 - `/code-review` reviews the diff along two independent axes, Standards and Spec, against the originating issue.
 - `/triage` routes inbound issues (bugs and external requests) through the five canonical triage roles.
@@ -24,13 +24,13 @@ The bundled skills form one connected chain:
 
 ## How the runner consumes it
 
-The Codex Runners daemon is the delivery engine underneath this flow. Planning and triage statuses are inert and editable (`backlog`, `needs_triage`, `needs_info`, `ready_for_human`, `wontfix`). When an issue reaches `ready_for_agent`, the scheduler claims it with a persistent developer runner and runs it through implement → review → verification → Done, then merges through one serialized integration lane.
+The Codex Runners daemon is the delivery engine underneath this flow. Backlog is passive and editable. The scheduler claims Todo tickets with a persistent developer runner and runs them through implement → QA → Review. Review is the final human stage and exposes Merge; merging integrates the delivery worktree branch into the configured integration branch. There is no Done stage.
 
 The schema records how each issue entered the board:
 
 - `kind` — `issue`, `spec`, `ticket`, `decision`, or `map`
 - `source` — `manual`, `triage`, `to_spec`, `to_tickets`, `wayfinder`, or `donna`
-- `category` and `triageState` — the triage dimension for inbound issues
+- `category` — the optional bug or enhancement dimension for inbound issues
 - `dependencies` — the blocking edges `/to-tickets` and `/wayfinder` work with
 
 ## Updating the vendored skills

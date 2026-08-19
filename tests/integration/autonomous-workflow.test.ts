@@ -33,7 +33,7 @@ describe("Scheduler", () => {
 
     await harness.scheduler.reconcile(harness.config.project.id);
     expect(harness.registry.getBoard(harness.config.project.id).tickets.map(ticket => [ticket.id, ticket.status])).toEqual([
-      ["foundation", "done"],
+      ["foundation", "review"],
       ["dependent", "blocked"]
     ]);
     const foundation = harness.runtime.getTicket(harness.config.project.id, "foundation");
@@ -41,15 +41,15 @@ describe("Scheduler", () => {
     foundation.integrationCommit = "merged-foundation";
     harness.runtime.setTicket(harness.config.project.id, "foundation", foundation);
     await harness.scheduler.reconcile(harness.config.project.id);
-    expect(harness.registry.getBoard(harness.config.project.id).tickets.find(ticket => ticket.id === "dependent")?.status).toBe("done");
+    expect(harness.registry.getBoard(harness.config.project.id).tickets.find(ticket => ticket.id === "dependent")?.status).toBe("review");
     expect(harness.executor.calls.filter(call => call.ticketId === "dependent")[0]?.afterTicketIds)
       .toContain("foundation");
   });
 
-  it("returns review and QA failures to the same explicitly assigned developer", async () => {
+  it("returns QA failures to the same explicitly assigned developer", async () => {
     const project = await createInitializedProject();
     cleanups.push(project.cleanup);
-    const executor = new ScriptedExecutor({ reviewFailures: 1, qaFailures: 1 });
+    const executor = new ScriptedExecutor({ qaFailures: 1 });
     const harness = await workflowHarness(project.root, executor);
     await addTicket(harness.registry, harness.config, {
       id: "auth",
@@ -63,17 +63,16 @@ describe("Scheduler", () => {
 
     expect(developerCalls.map(call => call.runnerId)).toEqual([
       "developer-03",
-      "developer-03",
       "developer-03"
     ]);
-    expect(harness.registry.getBoard(harness.config.project.id).tickets[0]?.status).toBe("done");
-    expect(harness.runtime.getTicket(harness.config.project.id, "auth").attempts).toBe(2);
+    expect(harness.registry.getBoard(harness.config.project.id).tickets[0]?.status).toBe("review");
+    expect(harness.runtime.getTicket(harness.config.project.id, "auth").attempts).toBe(1);
   });
 
-  it("blocks a ticket after three failed review loops", async () => {
+  it("blocks a ticket after three failed QA loops", async () => {
     const project = await createInitializedProject();
     cleanups.push(project.cleanup);
-    const executor = new ScriptedExecutor({ reviewFailures: 3 });
+    const executor = new ScriptedExecutor({ qaFailures: 3 });
     const harness = await workflowHarness(project.root, executor);
     await addTicket(harness.registry, harness.config, {
       id: "broken",
@@ -98,7 +97,7 @@ describe("Scheduler", () => {
     await harness.scheduler.reconcile(harness.config.project.id);
 
     expect(executor.maxActiveByRole.developer).toBe(1);
-    expect(harness.registry.getBoard(harness.config.project.id).tickets.every(ticket => ticket.status === "done")).toBe(true);
+    expect(harness.registry.getBoard(harness.config.project.id).tickets.every(ticket => ticket.status === "review")).toBe(true);
   });
 });
 
@@ -143,12 +142,10 @@ class ScriptedExecutor implements StageExecutor {
   }> = [];
   readonly maxActiveByRole: Record<RoleName, number> = { developer: 0, reviewer: 0, qa: 0 };
   #activeByRole: Record<RoleName, number> = { developer: 0, reviewer: 0, qa: 0 };
-  #reviewFailures: number;
   #qaFailures: number;
   #delay: number;
 
-  constructor(options: { reviewFailures?: number; qaFailures?: number; delay?: number } = {}) {
-    this.#reviewFailures = options.reviewFailures ?? 0;
+  constructor(options: { qaFailures?: number; delay?: number } = {}) {
     this.#qaFailures = options.qaFailures ?? 0;
     this.#delay = options.delay ?? 0;
   }
@@ -163,14 +160,10 @@ class ScriptedExecutor implements StageExecutor {
       ticketId: input.ticket.id,
       role: input.runner.role,
       runnerId: input.runner.id,
-      afterTicketIds: input.project.board.tickets.filter(ticket => ticket.status === "done").map(ticket => ticket.id)
+      afterTicketIds: input.project.board.tickets.filter(ticket => ticket.status === "review").map(ticket => ticket.id)
     });
     if (this.#delay) await new Promise(resolve => setTimeout(resolve, this.#delay));
     this.#activeByRole[input.runner.role] -= 1;
-    if (input.runner.role === "reviewer" && this.#reviewFailures > 0) {
-      this.#reviewFailures -= 1;
-      return { kind: "failed", summary: "Review failed", findings: ["Fix review issue"] };
-    }
     if (input.runner.role === "qa" && this.#qaFailures > 0) {
       this.#qaFailures -= 1;
       return { kind: "failed", summary: "QA failed", findings: ["Fix QA issue"] };

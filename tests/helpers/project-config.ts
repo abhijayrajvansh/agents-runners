@@ -18,7 +18,7 @@ export function projectConfig(overrides: Partial<ProjectConfig> = {}): ProjectCo
     },
     board: {
       revision: 0,
-      columns: ["backlog", "todo", "in_progress", "review", "qa", "blocked", "done"],
+      columns: ["backlog", "todo", "in_progress", "qa", "review", "blocked"],
       tickets: []
     },
     automation: {
@@ -28,7 +28,7 @@ export function projectConfig(overrides: Partial<ProjectConfig> = {}): ProjectCo
       humanInputTimeoutMinutes: 10,
       autoMerge: false,
       autoPush: true,
-      actionableStatuses: ["todo", "in_progress", "review", "qa"]
+      actionableStatuses: ["todo", "in_progress", "qa"]
     },
     pools: {
       developer: { max: 5, instructions: "" },
