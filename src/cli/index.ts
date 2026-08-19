@@ -245,7 +245,7 @@ async function printResumedAssignments(config: Awaited<ReturnType<typeof loadPro
 
 async function printProjectLinks(config: Awaited<ReturnType<typeof loadProjectConfig>>, localUrl: string): Promise<void> {
   let status = await readDaemonStatus(userRuntimeRoot());
-  for (let attempt = 0; attempt < 100 && !status.publicUrl; attempt += 1) {
+  for (let attempt = 0; attempt < 100 && (!status.running || !status.publicUrl); attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 100));
     status = await readDaemonStatus(userRuntimeRoot());
   }

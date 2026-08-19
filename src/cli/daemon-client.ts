@@ -1,4 +1,4 @@
-import { readFile } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 
 export type DaemonStatus = {
@@ -40,11 +40,18 @@ export function publicProjectUrl(status: DaemonStatus, projectId: string): strin
 
 export async function stopDaemon(runtimeRoot: string): Promise<DaemonStatus> {
   const status = await readDaemonStatus(runtimeRoot);
-  if (!status.running || status.pid === undefined) return status;
+  const metadataPath = path.join(runtimeRoot, "daemon.json");
+  if (!status.running || status.pid === undefined) {
+    await rm(metadataPath, { force: true });
+    return status;
+  }
   process.kill(status.pid, "SIGTERM");
   for (let attempt = 0; attempt < 50; attempt += 1) {
     await new Promise(resolve => setTimeout(resolve, 50));
-    if (!isProcessAlive(status.pid)) return { ...status, running: false };
+    if (!isProcessAlive(status.pid)) {
+      await rm(metadataPath, { force: true });
+      return { ...status, running: false };
+    }
   }
   throw new Error(`Codex Runners daemon ${status.pid} did not stop within 2.5 seconds`);
 }
