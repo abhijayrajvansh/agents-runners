@@ -170,6 +170,37 @@ export class AutomationManager {
     return merge;
   }
 
+  async abortTicket(projectId: string, ticketId: string, expectedRevision: number): Promise<{ revision: number; ticket: Ticket }> {
+    const automation = this.#projects.get(projectId);
+    if (!automation) throw new Error(`Automation runtime for ${projectId} is unavailable`);
+    const ticket = this.registry.getBoard(projectId).tickets.find(candidate => candidate.id === ticketId);
+    if (!ticket) throw new Error(`Ticket ${ticketId} was not found`);
+    if (!["todo", "in_progress", "review", "qa"].includes(ticket.status)) {
+      throw new Error(`${ticket.title} is not running and cannot be aborted`);
+    }
+    const result = await this.registry.updateTicket(projectId, ticketId, {
+      status: "blocked",
+      assignedRunnerId: null,
+      blocker: { kind: "human_input", reason: "Aborted by the user. Add instructions when you are ready to resume." }
+    }, expectedRevision);
+    const runtime = automation.runtime.getTicket(projectId, ticketId);
+    runtime.findings = ["The user stopped this ticket before the current stage completed."];
+    automation.runtime.setTicket(projectId, ticketId, runtime);
+    for (const pool of automation.pools.values()) {
+      for (const runner of pool.list().filter(candidate => candidate.ticketId === ticketId)) {
+        await this.tmux.interruptPane(runner.tmuxTarget).catch(() => undefined);
+        pool.release(runner.id);
+        this.events.publish({
+          type: "runner.updated",
+          projectId,
+          revision: result.revision,
+          payload: { runnerId: runner.id, status: "idle" }
+        });
+      }
+    }
+    return result;
+  }
+
   async #mergeTicket(projectId: string, ticketId: string): Promise<TicketDeliveryState> {
     const project = this.registry.get(projectId);
     const ticket = project.board.tickets.find(candidate => candidate.id === ticketId);

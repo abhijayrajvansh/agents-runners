@@ -61,6 +61,13 @@ export class RunnersApi {
     return response.delivery;
   }
 
+  async abortTicket(projectId: string, ticketId: string, expectedRevision: number): Promise<void> {
+    await this.#request(
+      `/api/projects/${encodeURIComponent(projectId)}/tickets/${encodeURIComponent(ticketId)}/abort`,
+      { method: "POST", body: JSON.stringify({ expectedRevision }) }
+    );
+  }
+
   async listTerminals(projectId: string): Promise<AgentTerminalSnapshot[]> {
     const response = await this.#request<{ terminals: AgentTerminalSnapshot[] }>(`/api/projects/${encodeURIComponent(projectId)}/terminals`);
     return response.terminals;

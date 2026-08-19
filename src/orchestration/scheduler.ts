@@ -318,7 +318,7 @@ function roleForStatus(status: TicketStatus): RoleName | null {
 }
 
 function preferredRunner(ticket: Ticket, role: RoleName, runtime: TicketRuntimeState): string | undefined {
-  if (role === "developer") return runtime.developerRunnerId ?? ticket.assignedRunnerId;
+  if (role === "developer") return runtime.developerRunnerId ?? ticket.assignedRunnerId ?? undefined;
   if (role === "reviewer") return runtime.reviewerRunnerId;
   return runtime.qaRunnerId;
 }

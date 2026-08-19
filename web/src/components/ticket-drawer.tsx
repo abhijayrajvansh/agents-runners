@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { LockKeyhole, OctagonX, X } from "lucide-react";
 
 import type { Ticket, TicketStatus } from "../../../src/domain/types.js";
 import { humanBlockerPrompt, readableBlockerReason } from "../../../src/orchestration/blockers.js";
@@ -12,9 +12,10 @@ export type TicketDrawerProps = {
   runners: RunnerRecord[];
   onClose(): void;
   onSave(ticket: Partial<Ticket> & { id?: string }): Promise<void>;
+  onAbort(ticketId: string): Promise<void>;
 };
 
-export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }: TicketDrawerProps) {
+export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, onAbort }: TicketDrawerProps) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<TicketStatus>("backlog");
@@ -23,6 +24,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
   const [acceptance, setAcceptance] = useState("");
   const [humanInput, setHumanInput] = useState("");
   const [saving, setSaving] = useState(false);
+  const [aborting, setAborting] = useState(false);
 
   useEffect(() => {
     setTitle(ticket?.title ?? "");
@@ -32,6 +34,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
     setAssignedRunnerId(ticket?.assignedRunnerId ?? "");
     setAcceptance(ticket?.acceptanceCriteria.join("\n") ?? "");
     setHumanInput("");
+    setAborting(false);
   }, [ticket, open]);
 
   if (!open) return null;
@@ -39,9 +42,11 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
   const needsHumanInput = ticket?.status === "blocked" && (ticket.blocker?.kind ?? (waitingForDependencies ? "dependency" : "human_input")) === "human_input";
   const blockerReason = readableBlockerReason(ticket?.blocker?.reason);
   const blockerPrompt = humanBlockerPrompt(ticket?.title ?? title, blockerReason);
+  const editable = !ticket || ["backlog", "blocked", "done"].includes(ticket.status);
+  const abortable = Boolean(ticket && ["todo", "in_progress", "review", "qa"].includes(ticket.status));
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!title.trim() || saving) return;
+    if (!editable || !title.trim() || saving) return;
     setSaving(true);
     try {
       const response = humanInput.trim();
@@ -61,11 +66,21 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
             createdAt: new Date().toISOString()
           }]
         } : {}),
-        ...(assignedRunnerId ? { assignedRunnerId } : {})
+        assignedRunnerId: assignedRunnerId || null
       });
       onClose();
     } finally {
       setSaving(false);
+    }
+  };
+  const abort = async () => {
+    if (!ticket || !abortable || aborting) return;
+    setAborting(true);
+    try {
+      await onAbort(ticket.id);
+      onClose();
+    } finally {
+      setAborting(false);
     }
   };
 
@@ -74,7 +89,9 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
       <aside className="ticket-drawer" role="dialog" aria-modal="true" aria-labelledby="ticket-drawer-title">
         <header><div><span className="eyebrow">{ticket ? ticket.id : "New work"}</span><h2 id="ticket-drawer-title">{ticket ? "Ticket details" : "Create ticket"}</h2></div><button type="button" aria-label="Close ticket drawer" onClick={onClose}><X size={18} /></button></header>
         <form onSubmit={event => void submit(event)}>
-          <label>Title<input autoFocus value={title} onChange={event => setTitle(event.target.value)} placeholder="What needs to be delivered?" /></label>
+          {!editable && <div className="ticket-lock-notice"><LockKeyhole size={15} /><div><strong>Editing locked while agents are working</strong><span>Use Abort only if you need to stop this delivery immediately.</span></div></div>}
+          <fieldset disabled={!editable}>
+          <label>Title<input autoFocus={editable} value={title} onChange={event => setTitle(event.target.value)} placeholder="What needs to be delivered?" /></label>
           <label>Description<textarea value={description} onChange={event => setDescription(event.target.value)} rows={5} placeholder="Give Donna and the runners useful context." /></label>
           <div className="form-row">
             <label>Status<select value={status} onChange={event => setStatus(event.target.value as TicketStatus)}><option value="backlog">Backlog</option><option value="todo">Todo — start automatically</option><option value="in_progress">In progress</option><option value="review">Review</option><option value="qa">QA</option><option value="blocked">Blocked</option><option value="done">Done</option></select></label>
@@ -102,7 +119,12 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave }
               <small>Saving your response moves this ticket to Todo and resumes its persistent agent automatically.</small>
             </div>
           )}
-          <div className="drawer-actions"><button type="button" className="quiet-button" onClick={onClose}>Cancel</button><button type="submit" className="primary-button" disabled={!title.trim() || saving || Boolean(needsHumanInput && !humanInput.trim())}>{saving ? "Saving…" : needsHumanInput ? "Save input & resume" : ticket ? "Save ticket" : "Create ticket"}</button></div>
+          </fieldset>
+          <div className="drawer-actions">
+            <button type="button" className="quiet-button" onClick={onClose}>{editable ? "Cancel" : "Close"}</button>
+            {abortable && <button type="button" className="abort-button" disabled={aborting} onClick={() => void abort()}><OctagonX size={15} />{aborting ? "Aborting…" : "Abort process"}</button>}
+            {editable && <button type="submit" className="primary-button" disabled={!title.trim() || saving || Boolean(needsHumanInput && !humanInput.trim())}>{saving ? "Saving…" : needsHumanInput ? "Save input & resume" : ticket ? "Save ticket" : "Create ticket"}</button>}
+          </div>
         </form>
       </aside>
     </div>

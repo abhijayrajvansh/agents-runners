@@ -52,6 +52,8 @@ Set `automation.enabled` to `false` to keep the board readable without starting 
 
 Development, review, QA, and repair loops run automatically. A QA-passed ticket is sealed to its own delivery branch and moved to Done. Only the **Merge to `<integrationBranch>`** button integrates it; after a successful verified merge, Codex Runners deletes that ticket delivery branch locally and remotely. Dependent tickets wait until the prerequisite is merged, not merely QA-passed.
 
+Ticket details are editable only in Backlog, Blocked, and Done. Todo, In Progress, Review, and QA tickets are read-only while agents own them. Their drawer exposes an emergency **Abort process** button that interrupts and unassigns active runners, clears the explicit assignment, and moves the ticket to Blocked for human instructions.
+
 ## Runner pools
 
 `pools.developer`, `pools.reviewer`, and `pools.qa` each accept:

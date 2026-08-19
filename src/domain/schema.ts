@@ -37,7 +37,7 @@ export const TicketSchema = z.object({
   dependencies: z.array(z.string()).default([]),
   blocker: TicketBlockerSchema.nullable().optional(),
   preferredRole: RoleNameSchema.optional(),
-  assignedRunnerId: z.string().optional(),
+  assignedRunnerId: z.string().nullable().optional(),
   developmentInstructions: z.string().default(""),
   qaInstructions: z.string().default(""),
   environment: z.string().default("development"),

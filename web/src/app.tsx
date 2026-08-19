@@ -144,6 +144,7 @@ export function App() {
         runners={state.runners}
         onClose={() => setDrawerOpen(false)}
         onSave={state.saveTicket}
+        onAbort={state.abortTicket}
       />
       <CommandPalette
         open={paletteOpen}

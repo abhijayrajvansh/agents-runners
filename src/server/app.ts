@@ -19,7 +19,7 @@ export type AppDependencies = {
   onProjectUnregistered?: (projectId: string, root: string) => Promise<void> | void;
   donna?: DonnaService;
   mcpTools?: McpTools;
-  automation?: Pick<AutomationManager, "list" | "get"> & Partial<Pick<AutomationManager, "terminals" | "deliveries" | "mergeTicket">>;
+  automation?: Pick<AutomationManager, "list" | "get"> & Partial<Pick<AutomationManager, "terminals" | "deliveries" | "mergeTicket" | "abortTicket">>;
   publicDirectory?: string;
   publicAccessToken?: string;
 };
@@ -136,13 +136,30 @@ export function createApp(dependencies: AppDependencies): Express {
 
   app.patch("/api/projects/:projectId/tickets/:ticketId", asyncRoute(async (request, response) => {
     const body = request.body as { expectedRevision?: unknown; patch?: unknown };
+    const projectId = requiredParam(request.params.projectId);
+    const ticketId = requiredParam(request.params.ticketId);
+    const current = dependencies.registry.getBoard(projectId).tickets.find(ticket => ticket.id === ticketId);
+    if (current && !["backlog", "blocked", "done"].includes(current.status)) {
+      response.status(423).json({ error: { code: "TICKET_LOCKED", message: "Active tickets are read-only. Abort the ticket before editing it." } });
+      return;
+    }
     const result = await dependencies.registry.updateTicket(
-      requiredParam(request.params.projectId),
-      requiredParam(request.params.ticketId),
+      projectId,
+      ticketId,
       body.patch,
       requiredRevision(body.expectedRevision)
     );
     response.json(result);
+  }));
+
+  app.post("/api/projects/:projectId/tickets/:ticketId/abort", asyncRoute(async (request, response) => {
+    if (!dependencies.automation?.abortTicket) throw new Error("Abort service is unavailable");
+    const body = request.body as { expectedRevision?: unknown };
+    response.json(await dependencies.automation.abortTicket(
+      requiredParam(request.params.projectId),
+      requiredParam(request.params.ticketId),
+      requiredRevision(body.expectedRevision)
+    ));
   }));
 
   app.get("/api/projects/:projectId/runners", asyncRoute(async (request, response) => {

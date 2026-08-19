@@ -27,6 +27,7 @@ export type ProjectState = {
   setDonnaModel(model: string): Promise<void>;
   messageDonna(message: string): Promise<string>;
   mergeTicket(ticketId: string): Promise<void>;
+  abortTicket(ticketId: string): Promise<void>;
 };
 
 export function useProject(projectId: string, api = defaultApi): ProjectState {
@@ -161,5 +162,17 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
     }
   }, [api, projectId, refresh]);
 
-  return { project, runners, activity, donnaMessages, models, deliveries, connected, loading, error, refresh, moveTicket, saveTicket, setPoolMaximum, setDonnaModel, messageDonna, mergeTicket };
+  const abortTicket = useCallback(async (ticketId: string) => {
+    if (!project) return;
+    try {
+      await api.abortTicket(projectId, ticketId, project.board.revision);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+      throw caught;
+    } finally {
+      await refresh();
+    }
+  }, [api, project, projectId, refresh]);
+
+  return { project, runners, activity, donnaMessages, models, deliveries, connected, loading, error, refresh, moveTicket, saveTicket, setPoolMaximum, setDonnaModel, messageDonna, mergeTicket, abortTicket };
 }
