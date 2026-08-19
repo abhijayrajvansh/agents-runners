@@ -8,6 +8,8 @@ export type DaemonStatus = {
   port?: number;
   version?: string;
   startedAt?: string;
+  publicUrl?: string;
+  publicAccessToken?: string;
 };
 
 export async function readDaemonStatus(runtimeRoot: string): Promise<DaemonStatus> {
@@ -21,12 +23,19 @@ export async function readDaemonStatus(runtimeRoot: string): Promise<DaemonStatu
       ...(typeof metadata.host === "string" ? { host: metadata.host } : {}),
       ...(typeof metadata.port === "number" ? { port: metadata.port } : {}),
       ...(typeof metadata.version === "string" ? { version: metadata.version } : {}),
-      ...(typeof metadata.startedAt === "string" ? { startedAt: metadata.startedAt } : {})
+      ...(typeof metadata.startedAt === "string" ? { startedAt: metadata.startedAt } : {}),
+      ...(typeof metadata.publicUrl === "string" ? { publicUrl: metadata.publicUrl } : {}),
+      ...(typeof metadata.publicAccessToken === "string" ? { publicAccessToken: metadata.publicAccessToken } : {})
     };
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return { running: false };
     throw error;
   }
+}
+
+export function publicProjectUrl(status: DaemonStatus, projectId: string): string | undefined {
+  if (!status.publicUrl || !status.publicAccessToken) return undefined;
+  return `${status.publicUrl}/projects/${encodeURIComponent(projectId)}?access=${encodeURIComponent(status.publicAccessToken)}`;
 }
 
 export async function stopDaemon(runtimeRoot: string): Promise<DaemonStatus> {

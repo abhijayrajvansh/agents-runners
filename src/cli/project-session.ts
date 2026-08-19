@@ -10,7 +10,7 @@ import type { RunnerRecord } from "../orchestration/runner-pool.js";
 import { ProjectConfigSchema } from "../domain/schema.js";
 import { projectConfigPath, projectRuntimePath } from "../platform/paths.js";
 import { RuntimeStore } from "../runtime/runtime-store.js";
-import { readDaemonStatus, stopDaemon } from "./daemon-client.js";
+import { publicProjectUrl, readDaemonStatus, stopDaemon } from "./daemon-client.js";
 
 const execFileAsync = promisify(execFile);
 const color = {
@@ -153,7 +153,7 @@ export async function printProjectSessions(
     try {
       const config = ProjectConfigSchema.parse(JSON.parse(await readFile(projectConfigPath(root), "utf8")));
       const runners = daemon.running ? await fetchProjectRunners(config) : [];
-      process.stdout.write(`\n${formatProjectSessionSummary(config, runners)}\n`);
+      process.stdout.write(`\n${formatProjectSessionSummary(config, runners, publicProjectUrl(daemon, config.project.id))}\n`);
     } catch {
       continue;
     }
@@ -170,12 +170,13 @@ export function selectProjectRoots(roots: string[], currentRoot: string, global:
   return matches.sort((left, right) => right.length - left.length).slice(0, 1);
 }
 
-export function formatProjectSessionSummary(config: ProjectConfig, runners: RunnerRecord[]): string {
+export function formatProjectSessionSummary(config: ProjectConfig, runners: RunnerRecord[], publicUrl?: string): string {
   const tickets = new Map(config.board.tickets.map(ticket => [ticket.id, ticket.title]));
   const active = runners.filter(runner => runner.status === "working" && runner.ticketId);
   const lines = [
     `${color.bold(config.project.name)} · ${config.project.integrationBranch}`,
-    `Board: ${color.cyan(`http://${config.server.host}:${config.server.port}/projects/${config.project.id}`)}`,
+    `Local:  ${color.cyan(`http://${config.server.host}:${config.server.port}/projects/${config.project.id}`)}`,
+    ...(publicUrl ? [`Tunnel: ${color.cyan(publicUrl)}`] : []),
     "",
     `Active agents · ${active.length}`
   ];

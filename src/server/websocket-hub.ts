@@ -3,13 +3,18 @@ import type { Server } from "node:http";
 import { WebSocket, WebSocketServer } from "ws";
 
 import type { EventBus } from "./event-bus.js";
+import { hasPublicAccess, isPublicRequest } from "./public-access.js";
 
-export function attachWebSocketServer(server: Server, events: EventBus): WebSocketServer {
+export function attachWebSocketServer(server: Server, events: EventBus, publicAccessToken?: string): WebSocketServer {
   const sockets = new WebSocketServer({ noServer: true });
 
   server.on("upgrade", (request, socket, head) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
-    if (url.pathname !== "/ws" || !url.searchParams.get("projectId")) {
+    if (
+      url.pathname !== "/ws" ||
+      !url.searchParams.get("projectId") ||
+      (publicAccessToken && isPublicRequest(request) && !hasPublicAccess(request, publicAccessToken))
+    ) {
       socket.destroy();
       return;
     }

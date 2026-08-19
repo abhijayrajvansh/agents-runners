@@ -12,7 +12,7 @@ import { Command } from "commander";
 
 import { ProjectConfigSchema } from "../domain/schema.js";
 import { runDonnaClient } from "./donna-client.js";
-import { readDaemonStatus, stopDaemon } from "./daemon-client.js";
+import { publicProjectUrl, readDaemonStatus, stopDaemon } from "./daemon-client.js";
 import { printProjectSessions, ProjectSessionError, waitForProjectSessionEnd } from "./project-session.js";
 import { runDoctor } from "../doctor/doctor.js";
 import { handleSessionStart } from "../hooks/session-start.js";
@@ -87,7 +87,8 @@ export function createCli(): Command {
         host: "127.0.0.1",
         port: options.port,
         runtimeRoot: userRuntimeRoot(),
-        version: "0.1.0"
+        version: "0.1.0",
+        enablePublicTunnel: true
       });
       const close = async () => {
         await daemon.close();
@@ -105,7 +106,8 @@ export function createCli(): Command {
       const config = await loadOrInitializeProject(options.root);
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
       if (config.server.openBrowser) await exec("open", [result.url]);
-      process.stdout.write(`Codex Runners started in the background.\n${result.url}\n`);
+      process.stdout.write("Codex Runners started in the background.\n");
+      await printProjectLinks(config, result.url);
       await printResumedAssignments(config);
     });
 
@@ -138,7 +140,8 @@ export function createCli(): Command {
       await waitForProjectSessionEnd(config.project.repositoryRoot);
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
       if (config.server.openBrowser) await exec("open", [result.url]);
-      process.stdout.write(`Codex Runners restarted in the background.\n${result.url}\n`);
+      process.stdout.write("Codex Runners restarted in the background.\n");
+      await printProjectLinks(config, result.url);
       await printResumedAssignments(config);
     });
 
@@ -238,6 +241,17 @@ async function printResumedAssignments(config: Awaited<ReturnType<typeof loadPro
   for (const runner of assigned) {
     process.stdout.write(`● ${runner.id} · ${runner.role} · ${runner.ticketId}\n`);
   }
+}
+
+async function printProjectLinks(config: Awaited<ReturnType<typeof loadProjectConfig>>, localUrl: string): Promise<void> {
+  let status = await readDaemonStatus(userRuntimeRoot());
+  for (let attempt = 0; attempt < 100 && !status.publicUrl; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    status = await readDaemonStatus(userRuntimeRoot());
+  }
+  process.stdout.write(`Local   ${localUrl}\n`);
+  const tunnelUrl = publicProjectUrl(status, config.project.id);
+  process.stdout.write(tunnelUrl ? `Tunnel  ${tunnelUrl}\n` : "Tunnel  unavailable (cloudflared could not establish a connection)\n");
 }
 
 function daemonDependencies(cliPath: string) {

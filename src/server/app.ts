@@ -9,6 +9,7 @@ import { listAvailableCodexModels } from "../runners/codex-models.js";
 import { StoreError } from "../storage/atomic-json-store.js";
 import type { EventBus } from "./event-bus.js";
 import { ProjectRegistryError, type ProjectRegistry } from "./project-registry.js";
+import { hasPublicAccess, isPublicRequest, PUBLIC_ACCESS_COOKIE } from "./public-access.js";
 
 export type AppDependencies = {
   registry: ProjectRegistry;
@@ -20,11 +21,27 @@ export type AppDependencies = {
   mcpTools?: McpTools;
   automation?: Pick<AutomationManager, "list" | "get"> & Partial<Pick<AutomationManager, "terminals">>;
   publicDirectory?: string;
+  publicAccessToken?: string;
 };
 
 export function createApp(dependencies: AppDependencies): Express {
   const app = express();
   app.disable("x-powered-by");
+  if (dependencies.publicAccessToken) {
+    app.use((request, response, next) => {
+      if (!isPublicRequest(request) || hasPublicAccess(request, dependencies.publicAccessToken!)) {
+        if (isPublicRequest(request) && request.query.access === dependencies.publicAccessToken) {
+          response.setHeader(
+            "set-cookie",
+            `${PUBLIC_ACCESS_COOKIE}=${encodeURIComponent(dependencies.publicAccessToken!)}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=86400`
+          );
+        }
+        next();
+        return;
+      }
+      response.status(401).send("This Codex Runners link requires its private access token.");
+    });
+  }
   app.use(express.json({ limit: "1mb" }));
 
   app.get("/health", (_request, response) => {

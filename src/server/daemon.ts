@@ -10,6 +10,8 @@ import { EventBus } from "./event-bus.js";
 import { ProjectRegistry } from "./project-registry.js";
 import { attachWebSocketServer } from "./websocket-hub.js";
 import { RuntimeStore } from "../runtime/runtime-store.js";
+import { randomBytes } from "node:crypto";
+import { startPublicTunnel, type PublicTunnel } from "./public-tunnel.js";
 
 export type StartDaemonOptions = {
   host: string;
@@ -17,12 +19,14 @@ export type StartDaemonOptions = {
   runtimeRoot: string;
   version: string;
   publicDirectory?: string;
+  enablePublicTunnel?: boolean;
 };
 
 export type DaemonHandle = {
   host: string;
   port: number;
   url: string;
+  publicUrl?: string;
   close(): Promise<void>;
 };
 
@@ -47,6 +51,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     runtimeFor: project => automation.runtimeFor(project)
   });
   const mcpTools = new McpTools({ registry, events, runners: automation, donna });
+  const publicAccessToken = options.enablePublicTunnel ? randomBytes(24).toString("base64url") : undefined;
   const app = createApp({
     registry,
     events,
@@ -54,6 +59,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     automation,
     donna,
     mcpTools,
+    ...(publicAccessToken ? { publicAccessToken } : {}),
     publicDirectory: options.publicDirectory ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../../dist/public"),
     onProjectRegistered: async root => {
       await runtime.rememberProject(root);
@@ -67,7 +73,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     }
   });
   const server = createServer(app);
-  const sockets = attachWebSocketServer(server, events);
+  const sockets = attachWebSocketServer(server, events, publicAccessToken);
 
   try {
     await listen(server, options.host, options.port);
@@ -87,12 +93,17 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     await releaseLock();
     throw new Error("Codex Runners daemon did not bind a TCP address");
   }
+  let tunnel: PublicTunnel | undefined;
+  if (options.enablePublicTunnel) {
+    tunnel = await startPublicTunnel(`http://${options.host}:${address.port}`).catch(() => undefined);
+  }
   await runtime.writeMetadata({
     pid: process.pid,
     host: options.host,
     port: address.port,
     version: options.version,
-    startedAt: new Date().toISOString()
+    startedAt: new Date().toISOString(),
+    ...(tunnel ? { publicUrl: tunnel.url, publicAccessToken } : {})
   });
   let closed = false;
 
@@ -100,11 +111,13 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     host: options.host,
     port: address.port,
     url: `http://${options.host}:${address.port}`,
+    ...(tunnel ? { publicUrl: tunnel.url } : {}),
     async close() {
       if (closed) return;
       closed = true;
       for (const client of sockets.clients) client.terminate();
       sockets.close();
+      await tunnel?.close();
       await closeServer(server);
       registry.close();
       automation.close();

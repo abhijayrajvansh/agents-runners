@@ -65,7 +65,7 @@ describe("project session list", () => {
 
     expect(formatProjectSessionSummary(config, runners)).toBe([
       "com · dev",
-      "Board: http://127.0.0.1:4777/projects/com",
+      "Local:  http://127.0.0.1:4777/projects/com",
       "",
       "Active agents · 1",
       "🔍 reviewer-01  Define project schema"
