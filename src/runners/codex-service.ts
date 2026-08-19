@@ -1,4 +1,7 @@
+import { readFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
+import { homedir } from "node:os";
+import path from "node:path";
 
 import type { Redactor } from "../security/redactor.js";
 import type { TmuxPane, TmuxService } from "./tmux-service.js";
@@ -26,11 +29,18 @@ export class CodexService {
   readonly tmux: TmuxService;
   readonly redactor: Redactor;
   readonly codexCommand: string;
+  readonly configOverrides: string[];
 
-  constructor(tmux: TmuxService, redactor: Redactor, codexCommand = "codex") {
+  constructor(
+    tmux: TmuxService,
+    redactor: Redactor,
+    codexCommand = "codex",
+    configOverrides: string[] = []
+  ) {
     this.tmux = tmux;
     this.redactor = redactor;
     this.codexCommand = codexCommand;
+    this.configOverrides = configOverrides;
   }
 
   async runTurn(input: CodexTurnInput, onEvent?: (event: CodexEvent) => void): Promise<{
@@ -39,7 +49,7 @@ export class CodexService {
     exitCode: number;
     events: CodexEvent[];
   }> {
-    const args = buildCodexArgs(input);
+    const args = buildCodexArgs({ ...input, configOverrides: this.configOverrides });
     const job = await this.tmux.runInPane(input.pane, {
       command: this.codexCommand,
       args,
@@ -110,10 +120,12 @@ export function buildCodexArgs(input: {
   worktreePath: string;
   model?: string;
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
+  configOverrides?: string[];
 }): string[] {
   const modelOptions = [
     ...(input.model ? ["--model", input.model] : []),
-    ...(input.reasoningEffort ? ["--config", `model_reasoning_effort=${JSON.stringify(input.reasoningEffort)}`] : [])
+    ...(input.reasoningEffort ? ["--config", `model_reasoning_effort=${JSON.stringify(input.reasoningEffort)}`] : []),
+    ...(input.configOverrides ?? []).flatMap(value => ["--config", value])
   ];
   if (input.threadId) {
     return [
@@ -135,6 +147,21 @@ export function buildCodexArgs(input: {
     "-C",
     input.worktreePath
   ];
+}
+
+export function detectCodexRouterOverrides(configPath = path.join(homedir(), ".codex", "config.toml")): string[] {
+  try {
+    const source = readFileSync(configPath, "utf8");
+    const providers = [...source.matchAll(/^\[model_providers\.(?:"([^"]+)"|([A-Za-z0-9_-]+))\]\s*$/gm)]
+      .map(match => match[1] ?? match[2]);
+    if (!providers.includes("codex-router")) return [];
+    return [
+      'model_provider="codex-router"',
+      "model_providers.codex-router.supports_websockets=false"
+    ];
+  } catch {
+    return [];
+  }
 }
 
 export function parseCodexEvent(line: string): CodexEvent {

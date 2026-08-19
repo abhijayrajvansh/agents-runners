@@ -2,7 +2,7 @@ import type { ProjectConfig, RoleName, Ticket } from "../domain/types.js";
 import { IntegrationService } from "../git/integration-service.js";
 import { projectRuntimePath } from "../platform/paths.js";
 import { CommandRunner } from "../process/command-runner.js";
-import { CodexService } from "../runners/codex-service.js";
+import { CodexService, detectCodexRouterOverrides } from "../runners/codex-service.js";
 import { TmuxService } from "../runners/tmux-service.js";
 import { WorktreeService } from "../runners/worktree-service.js";
 import { JsonProjectRuntime, type ProjectRuntimeRepository, type TicketDeliveryState } from "../runtime/project-runtime.js";
@@ -50,7 +50,12 @@ export class AutomationManager {
     this.commands = new CommandRunner();
     this.worktrees = new WorktreeService(this.commands);
     this.tmux = new TmuxService(this.commands);
-    this.codex = new CodexService(this.tmux, new Redactor([]), options.codexCommand ?? "codex");
+    this.codex = new CodexService(
+      this.tmux,
+      new Redactor([]),
+      options.codexCommand ?? "codex",
+      detectCodexRouterOverrides()
+    );
     this.integration = new IntegrationService(this.commands, this.worktrees);
   }
 
@@ -73,6 +78,7 @@ export class AutomationManager {
           model: config.pools[createdRole].model ?? "gpt-5.6-sol",
           reasoningEffort: config.pools[createdRole].reasoningEffort ?? "medium",
           fullAccess: config.automation.fullAccess,
+          configOverrides: this.codex.configOverrides,
           env: { CODEX_RUNNERS_PROJECT_ROOT: config.project.repositoryRoot }
         });
         const automationPane = await this.tmux.ensurePane({
@@ -287,6 +293,7 @@ export class AutomationManager {
         model: config.pools[role].model ?? "gpt-5.6-sol",
         reasoningEffort: config.pools[role].reasoningEffort ?? "medium",
         fullAccess: config.automation.fullAccess,
+        configOverrides: this.codex.configOverrides,
         env: { CODEX_RUNNERS_PROJECT_ROOT: config.project.repositoryRoot }
       });
     }));

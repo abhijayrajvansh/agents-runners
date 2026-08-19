@@ -31,6 +31,7 @@ export type InteractiveCodexSpec = {
   model?: string;
   reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
   fullAccess: boolean;
+  configOverrides?: string[];
   env?: Record<string, string>;
 };
 
@@ -113,6 +114,7 @@ export class TmuxService {
     const args = [
       ...(spec.model ? ["--model", spec.model] : []),
       ...(spec.reasoningEffort ? ["--config", `model_reasoning_effort=${JSON.stringify(spec.reasoningEffort)}`] : []),
+      ...(spec.configOverrides ?? []).flatMap(value => ["--config", value]),
       ...(spec.fullAccess ? ["--dangerously-bypass-approvals-and-sandbox"] : []),
       "--no-alt-screen",
       "-C",

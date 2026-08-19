@@ -68,6 +68,8 @@ When a runner genuinely needs a decision, it must record the exact question and 
 
 Runner IDs are stable (`developer-01`, `reviewer-01`, `qa-01`). Explicit ticket assignment takes priority over automatic claiming.
 
+When the local Codex configuration includes a `codex-router` provider, Codex Runners selects it explicitly and disables Responses WebSocket probing for runner and Donna processes. The router continues to stream over its supported HTTP Responses transport without noisy `426 Upgrade Required` fallback errors. Other Codex provider configurations are left unchanged.
+
 ## Worktrees and environments
 
 Persistent runner worktrees default to `.worktrees/codex-runners/<runner-id>` with branches under `codex-runners/`. They are never automatically deleted.
