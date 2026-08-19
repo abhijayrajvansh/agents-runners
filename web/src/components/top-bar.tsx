@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, LayoutDashboard, Plus, TerminalSquare } from "lucide-react";
+import { ChevronDown, ChevronUp, LayoutDashboard, Moon, Plus, Sun, TerminalSquare } from "lucide-react";
 import type { RoleName } from "../../../src/domain/types.js";
 
 export type TopBarProps = {
@@ -7,11 +7,13 @@ export type TopBarProps = {
   branch: string;
   view: "board" | "terminals";
   poolMaximums: Record<RoleName, number>;
+  theme: "light" | "dark";
   onSetPoolMaximum(role: RoleName, maximum: number): Promise<void>;
+  onToggleTheme(): void;
   onCreate(): void;
 };
 
-export function TopBar({ projectName, projectId, branch, view, poolMaximums, onSetPoolMaximum, onCreate }: TopBarProps) {
+export function TopBar({ projectName, projectId, branch, view, poolMaximums, theme, onSetPoolMaximum, onToggleTheme, onCreate }: TopBarProps) {
   return (
     <header className="top-bar">
       <div className="brand-lockup">
@@ -28,6 +30,15 @@ export function TopBar({ projectName, projectId, branch, view, poolMaximums, onS
           <AgentCapacity emoji="🔍" label="reviewers" role="reviewer" maximum={poolMaximums.reviewer} onChange={onSetPoolMaximum} />
           <AgentCapacity emoji="🧪" label="QA testers" role="qa" maximum={poolMaximums.qa} onChange={onSetPoolMaximum} />
         </div>
+        <button
+          type="button"
+          className="theme-toggle"
+          aria-label={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+          title={`Switch to ${theme === "light" ? "dark" : "light"} theme`}
+          onClick={onToggleTheme}
+        >
+          {theme === "light" ? <Moon size={15} /> : <Sun size={15} />}
+        </button>
         <button type="button" className="primary-button" onClick={onCreate}><Plus size={15} />Create ticket</button>
       </div>
     </header>

@@ -21,10 +21,23 @@ export function App() {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [donnaOpen, setDonnaOpen] = useState(true);
   const [compactCards, setCompactCards] = useState(() => localStorage.getItem("codex-runners:compact-cards") !== "false");
+  const [theme, setTheme] = useState<"light" | "dark">(() => (
+    document.documentElement.dataset.theme === "dark" ? "dark" : "light"
+  ));
   const shell = useRef<HTMLDivElement>(null);
   const selectedTicket = useMemo<Ticket | null>(() => (
     state.project?.board.tickets.find(ticket => ticket.id === selectedTicketId) ?? null
   ), [selectedTicketId, state.project]);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document.querySelector<HTMLMetaElement>('meta[name="theme-color"]')?.setAttribute(
+      "content",
+      theme === "dark" ? "#171816" : "#ffffff"
+    );
+    localStorage.setItem("codex-runners:theme", theme);
+  }, [theme]);
 
   useEffect(() => {
     if (!requestedTicketId || !state.project?.board.tickets.some(ticket => ticket.id === requestedTicketId)) return;
@@ -87,6 +100,8 @@ export function App() {
         }}
         onSetPoolMaximum={state.setPoolMaximum}
         onCreate={createTicket}
+        theme={theme}
+        onToggleTheme={() => setTheme(current => current === "light" ? "dark" : "light")}
       />
       {state.error && <div className="error-banner"><AlertCircle size={15} />{state.error}<button type="button" onClick={() => void state.refresh()}>Retry</button></div>}
       {terminalView ? <AgentTerminals projectId={state.project.project.id} /> : <main className="workspace" data-donna-collapsed={!donnaOpen || undefined}>
