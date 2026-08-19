@@ -204,7 +204,8 @@ export class ProjectRegistry {
       metadata: { ...project.config.metadata, updatedAt: now },
       donna: {
         model,
-        reasoningEffort: project.config.donna?.reasoningEffort ?? "low"
+        reasoningEffort: project.config.donna?.reasoningEffort ?? "low",
+        timeoutMs: project.config.donna?.timeoutMs ?? 180_000
       }
     }, expectedRevision);
     project.config = next;

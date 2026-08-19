@@ -24,6 +24,7 @@ describe("ensureDaemonForProject", () => {
       body: { root: "/tmp/demo-project" }
     });
     expect(result.url).toBe("http://127.0.0.1:4777/projects/demo-project");
+    expect(result.started).toBe(true);
   });
 
   it("reuses a healthy daemon without spawning another process", async () => {

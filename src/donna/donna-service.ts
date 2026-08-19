@@ -114,7 +114,7 @@ export class DonnaService {
       fullAccess: project.automation.fullAccess,
       model: project.donna?.model ?? "gpt-5.6-luna",
       reasoningEffort: project.donna?.reasoningEffort ?? "low",
-      timeoutMs: 45_000,
+      timeoutMs: project.donna?.timeoutMs ?? 180_000,
       env: { CODEX_RUNNERS_PROJECT_ROOT: project.project.repositoryRoot },
       ...(threadId ? { threadId } : {})
     });

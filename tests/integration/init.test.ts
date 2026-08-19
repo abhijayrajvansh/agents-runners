@@ -74,7 +74,7 @@ describe("handleSessionStart", () => {
       pluginRoot: "/Users/example/plugins/codex-runners",
       nodePath: "/usr/bin/node"
     });
-    const ensureDaemon = vi.fn().mockResolvedValue({ url: "http://127.0.0.1:4777/projects/demo" });
+    const ensureDaemon = vi.fn().mockResolvedValue({ url: "http://127.0.0.1:4777/projects/demo", started: true });
     const openBrowser = vi.fn().mockResolvedValue(undefined);
 
     const output = await handleSessionStart({ cwd: root, source: "startup", session_id: "session-1" }, {
@@ -86,6 +86,24 @@ describe("handleSessionStart", () => {
     expect(openBrowser).toHaveBeenCalledWith("http://127.0.0.1:4777/projects/demo");
     expect(output.additionalContext).toContain("Donna");
     expect(output.additionalContext).toContain("get_board");
+  });
+
+  it("reuses the existing daemon without opening a second browser tab", async () => {
+    const root = await createRepository();
+    await initializeProject(root, {
+      pluginRoot: "/Users/example/plugins/codex-runners",
+      nodePath: "/usr/bin/node"
+    });
+    const ensureDaemon = vi.fn().mockResolvedValue({ url: "http://127.0.0.1:4777/projects/demo", started: false });
+    const openBrowser = vi.fn().mockResolvedValue(undefined);
+
+    await handleSessionStart({ cwd: root, source: "startup", session_id: "session-2" }, {
+      ensureDaemon,
+      openBrowser
+    });
+
+    expect(ensureDaemon).toHaveBeenCalledWith(root);
+    expect(openBrowser).not.toHaveBeenCalled();
   });
 
   it("does nothing outside an initialized project", async () => {

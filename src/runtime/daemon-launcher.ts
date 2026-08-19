@@ -14,12 +14,14 @@ export type DaemonLauncherDependencies = {
 export async function ensureDaemonForProject(
   config: ProjectConfig,
   dependencies: DaemonLauncherDependencies
-): Promise<{ url: string }> {
+): Promise<{ url: string; started: boolean }> {
   const baseUrl = `http://${config.server.host}:${config.server.port}`;
   const healthUrl = `${baseUrl}/health`;
   let healthy = await isHealthy(healthUrl, dependencies);
+  let started = false;
 
   if (!healthy) {
+    started = true;
     await dependencies.spawnDaemon();
     for (let attempt = 0; attempt < 40 && !healthy; attempt += 1) {
       await dependencies.sleep(100);
@@ -34,7 +36,7 @@ export async function ensureDaemonForProject(
   });
   if (!registered.ok) throw new Error(`Codex Runners could not register ${config.project.repositoryRoot}`);
 
-  return { url: `${baseUrl}/projects/${config.project.id}` };
+  return { url: `${baseUrl}/projects/${config.project.id}`, started };
 }
 
 async function isHealthy(url: string, dependencies: DaemonLauncherDependencies): Promise<boolean> {

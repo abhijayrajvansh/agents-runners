@@ -12,7 +12,7 @@ export type SessionStartInput = {
 };
 
 export type SessionStartDependencies = {
-  ensureDaemon(root: string): Promise<{ url: string }>;
+  ensureDaemon(root: string): Promise<{ url: string; started: boolean }>;
   openBrowser(url: string): Promise<void>;
 };
 
@@ -24,7 +24,10 @@ export async function handleSessionStart(
   if (!root) return {};
   const config = await new AtomicJsonStore(projectConfigPath(root), ProjectConfigSchema).load();
   const daemon = await dependencies.ensureDaemon(root);
-  if (config.server.openBrowser) await dependencies.openBrowser(daemon.url);
+  // Only open the board when this session actually started the daemon. Reusing
+  // an already-running project must not spawn a second browser tab on every
+  // SessionStart; the existing tab stays connected over WebSocket.
+  if (config.server.openBrowser && daemon.started) await dependencies.openBrowser(daemon.url);
 
   return {
     additionalContext: [

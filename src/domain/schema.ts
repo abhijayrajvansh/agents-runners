@@ -104,7 +104,8 @@ export const ProjectConfigSchema = z.object({
   }).strict().default({ host: "127.0.0.1", port: 4777, openBrowser: true }),
   donna: z.object({
     model: z.string().min(1).default("gpt-5.6-luna"),
-    reasoningEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).default("low")
+    reasoningEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).default("low"),
+    timeoutMs: z.number().int().min(5000).max(600_000).default(180_000)
   }).strict().optional(),
   board: z.object({
     revision: z.number().int().nonnegative(),
