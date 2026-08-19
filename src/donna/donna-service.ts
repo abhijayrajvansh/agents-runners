@@ -4,7 +4,7 @@ import type { ProjectConfig } from "../domain/types.js";
 import { projectRuntimePath } from "../platform/paths.js";
 import type { CodexEvent, CodexService, CodexTurnInput } from "../runners/codex-service.js";
 import type { TmuxService } from "../runners/tmux-service.js";
-import type { DonnaConversationMessage, ProjectRuntimeRepository } from "../runtime/project-runtime.js";
+import type { DonnaConversationMessage, DonnaSession, ProjectRuntimeRepository } from "../runtime/project-runtime.js";
 import type { EventBus } from "../server/event-bus.js";
 import type { ProjectRegistry } from "../server/project-registry.js";
 
@@ -32,20 +32,35 @@ export class DonnaService {
     this.dependencies = dependencies;
   }
 
-  send(projectId: string, message: string, source: DonnaMessageSource = "mcp"): AsyncIterable<DonnaEvent> {
-    return this.#send(projectId, message, source);
+  send(projectId: string, message: string, source: DonnaMessageSource = "mcp", sessionId = "default"): AsyncIterable<DonnaEvent> {
+    return this.#send(projectId, message, source, sessionId);
   }
 
-  history(projectId: string): DonnaConversationMessage[] {
+  history(projectId: string, sessionId = "default"): DonnaConversationMessage[] {
     const project = this.dependencies.registry.get(projectId);
-    return this.dependencies.runtimeFor(project).getDonnaMessages(projectId);
+    return this.dependencies.runtimeFor(project).getDonnaMessages(projectId, sessionId);
   }
 
-  async *#send(projectId: string, message: string, source: DonnaMessageSource): AsyncGenerator<DonnaEvent> {
+  sessions(projectId: string): DonnaSession[] {
+    const project = this.dependencies.registry.get(projectId);
+    return this.dependencies.runtimeFor(project).listDonnaSessions(projectId);
+  }
+
+  createSession(projectId: string, title?: string): DonnaSession {
+    const project = this.dependencies.registry.get(projectId);
+    return this.dependencies.runtimeFor(project).createDonnaSession(projectId, title);
+  }
+
+  resetSession(projectId: string, sessionId: string): void {
+    const project = this.dependencies.registry.get(projectId);
+    this.dependencies.runtimeFor(project).clearDonnaSession(projectId, sessionId);
+  }
+
+  async *#send(projectId: string, message: string, source: DonnaMessageSource, sessionId = "default"): AsyncGenerator<DonnaEvent> {
     const previous = this.#turns.get(projectId) ?? Promise.resolve();
     await previous.catch(() => undefined);
     const queue = new AsyncEventQueue<DonnaEvent>();
-    const turn = this.#runTurn(projectId, message, source, event => queue.push(event))
+    const turn = this.#runTurn(projectId, message, source, sessionId, event => queue.push(event))
       .catch(error => {
         queue.push({ type: "error", projectId, message: error instanceof Error ? error.message : String(error) });
       })
@@ -63,19 +78,20 @@ export class DonnaService {
     projectId: string,
     message: string,
     source: DonnaMessageSource,
+    sessionId: string,
     emit: (event: DonnaEvent) => void
   ): Promise<void> {
     const project = this.dependencies.registry.get(projectId);
     const runtime = this.dependencies.runtimeFor(project);
-    const recentConversation = runtime.getDonnaMessages(projectId).slice(-8);
-    const userMessage = runtime.appendDonnaMessage(projectId, { author: "user", text: message, source });
+    const recentConversation = runtime.getDonnaMessages(projectId, sessionId).slice(-8);
+    const userMessage = runtime.appendDonnaMessage(projectId, { author: "user", text: message, source }, sessionId);
     this.dependencies.events.publish({
       type: "donna.user",
       projectId,
       revision: project.board.revision,
       payload: { message: userMessage }
     });
-    const delegated = await this.#delegateWorkRequest(project, message, source);
+    const delegated = await this.#delegateWorkRequest(project, message, source, sessionId);
     if (delegated) {
       emit({ type: "started", projectId, source });
       const messageEvent: DonnaEvent = { type: "message", projectId, text: delegated };
@@ -86,7 +102,7 @@ export class DonnaService {
       this.#publish(projectId, completed);
       return;
     }
-    const resumed = await this.#resumeWorkRequest(project, message, source);
+    const resumed = await this.#resumeWorkRequest(project, message, source, sessionId);
     if (resumed) {
       emit({ type: "started", projectId, source });
       const messageEvent: DonnaEvent = { type: "message", projectId, text: resumed };
@@ -105,7 +121,7 @@ export class DonnaService {
     });
     emit({ type: "started", projectId, source });
     let lastMessage = "";
-    const savedThreadId = runtime.getDonnaThread(projectId);
+    const savedThreadId = runtime.getDonnaThread(projectId, sessionId);
     const turnInput = (threadId?: string): CodexTurnInput => ({
       pane,
       runtimeDirectory: path.join(projectRuntimePath(project.project.repositoryRoot), "donna"),
@@ -119,7 +135,7 @@ export class DonnaService {
       ...(threadId ? { threadId } : {})
     });
     const handleEvent = (event: CodexEvent) => {
-      if (event.type === "thread.started") runtime.setDonnaThread(projectId, event.threadId);
+      if (event.type === "thread.started") runtime.setDonnaThread(projectId, event.threadId, sessionId);
       if (event.type !== "message.completed") return;
       lastMessage = event.text;
       const donnaEvent: DonnaEvent = { type: "message", projectId, text: event.text };
@@ -128,13 +144,13 @@ export class DonnaService {
     };
     let result = await this.dependencies.codex.runTurn(turnInput(savedThreadId), handleEvent);
     if (savedThreadId && result.exitCode !== 0) {
-      runtime.clearDonnaThread(projectId);
+      runtime.clearDonnaThread(projectId, sessionId);
       lastMessage = "";
       result = await this.dependencies.codex.runTurn(turnInput(), handleEvent);
     }
     if (result.exitCode !== 0) throw new Error(`Donna exited with code ${result.exitCode}: ${result.message}`);
-    if (result.threadId) runtime.setDonnaThread(projectId, result.threadId);
-    if (result.message) runtime.appendDonnaMessage(projectId, { author: "donna", text: result.message, source });
+    if (result.threadId) runtime.setDonnaThread(projectId, result.threadId, sessionId);
+    if (result.message) runtime.appendDonnaMessage(projectId, { author: "donna", text: result.message, source }, sessionId);
     if (result.message && result.message !== lastMessage) {
       const messageEvent: DonnaEvent = { type: "message", projectId, text: result.message };
       emit(messageEvent);
@@ -159,7 +175,7 @@ export class DonnaService {
     });
   }
 
-  async #delegateWorkRequest(project: ProjectConfig, message: string, source: DonnaMessageSource): Promise<string | null> {
+  async #delegateWorkRequest(project: ProjectConfig, message: string, source: DonnaMessageSource, sessionId: string): Promise<string | null> {
     const request = parseWorkRequest(message);
     if (!request) return null;
     const result = await this.dependencies.registry.createTicket(project.project.id, {
@@ -187,11 +203,11 @@ export class DonnaService {
       author: "donna",
       text: reply,
       source
-    });
+    }, sessionId);
     return reply;
   }
 
-  async #resumeWorkRequest(project: ProjectConfig, message: string, source: DonnaMessageSource): Promise<string | null> {
+  async #resumeWorkRequest(project: ProjectConfig, message: string, source: DonnaMessageSource, sessionId: string): Promise<string | null> {
     if (!isResumeRequest(message)) return null;
     let board = this.dependencies.registry.getBoard(project.project.id);
     const resumable = board.tickets.filter(candidate => candidate.status === "blocked" && candidate.blocker?.kind === "human_input");
@@ -220,7 +236,7 @@ export class DonnaService {
       author: "donna",
       text: reply,
       source
-    });
+    }, sessionId);
     return reply;
   }
 }

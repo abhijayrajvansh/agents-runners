@@ -32,4 +32,31 @@ describe("JsonProjectRuntime", () => {
       tickets: { "demo:auth": { attempts: 2 } }
     });
   });
+
+  it("keeps Donna sessions separate while preserving the shared project runtime", async () => {
+    const root = await mkdtemp(path.join(tmpdir(), "codex-runners-runtime-"));
+    roots.push(root);
+    const runtime = new JsonProjectRuntime(root);
+    runtime.appendDonnaMessage("demo", {
+      author: "user",
+      text: "Track the login issue",
+      source: "browser"
+    });
+    const session = runtime.createDonnaSession("demo", "Login follow-up");
+    runtime.appendDonnaMessage("demo", {
+      author: "user",
+      text: "Start a fresh plan",
+      source: "browser"
+    }, session.id);
+    runtime.setTicket("demo", "auth", { attempts: 1, findings: [], developerRunnerId: "developer-01" });
+
+    expect(runtime.listDonnaSessions("demo").map(item => item.title)).toEqual(["Main chat", "Login follow-up"]);
+    expect(runtime.getDonnaMessages("demo")).toHaveLength(1);
+    expect(runtime.getDonnaMessages("demo", session.id)).toHaveLength(1);
+    expect(runtime.getTicket("demo", "auth")).toMatchObject({ developerRunnerId: "developer-01" });
+
+    runtime.clearDonnaSession("demo", session.id);
+    expect(runtime.getDonnaMessages("demo", session.id)).toEqual([]);
+    expect(runtime.getTicket("demo", "auth")).toMatchObject({ developerRunnerId: "developer-01" });
+  });
 });

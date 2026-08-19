@@ -28,4 +28,35 @@ describe("DonnaRail", () => {
 
     expect(collapse).toHaveBeenCalledOnce();
   });
+
+  it("offers new, reset, and session switching controls", async () => {
+    const select = vi.fn().mockResolvedValue(undefined);
+    const create = vi.fn().mockResolvedValue(undefined);
+    const reset = vi.fn().mockResolvedValue(undefined);
+    render(
+      <DonnaRail
+        projectName="Northstar"
+        sessions={[
+          { id: "default", title: "Main chat", createdAt: "", updatedAt: "" },
+          { id: "fresh", title: "Fresh plan", createdAt: "", updatedAt: "" }
+        ]}
+        sessionId="default"
+        onSend={vi.fn()}
+        onSelectSession={select}
+        onNewSession={create}
+        onResetSession={reset}
+        onCollapse={vi.fn()}
+      />
+    );
+
+    fireEvent.change(screen.getByRole("combobox", { name: "Donna chat session" }), { target: { value: "fresh" } });
+    fireEvent.click(screen.getByRole("button", { name: "New Donna chat" }));
+    fireEvent.click(screen.getByRole("button", { name: "Reset Donna chat" }));
+
+    await waitFor(() => {
+      expect(select).toHaveBeenCalledWith("fresh");
+      expect(create).toHaveBeenCalledOnce();
+      expect(reset).toHaveBeenCalledOnce();
+    });
+  });
 });

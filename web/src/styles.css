@@ -162,6 +162,10 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .donna-header > div:nth-child(2) { display: flex; flex-direction: column; }
 .donna-header strong { font-size: 13px; font-weight: 500; }.donna-header span { color: var(--muted); font-size: 10px; }
 .donna-header .presence-dot { margin-left: auto; background: var(--success); }.donna-header .presence-dot--busy { background: var(--warning); }
+.donna-session-actions { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.donna-session-actions select { max-width: 112px; padding: 4px 18px 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface-raised); color: var(--muted); font-size: 9px; }
+.donna-session-action { display: grid; place-items: center; width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); border-radius: 7px; background: var(--surface-raised); color: var(--muted); cursor: pointer; }
+.donna-session-action:hover { border-color: var(--line-strong); background: var(--soft); color: var(--ink); }
 .donna-collapse { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-raised); color: var(--muted); cursor: pointer; }
 .donna-collapse:hover { border-color: var(--line-strong); background: var(--soft); color: var(--ink); }
 .donna-reopen { position: fixed; top: 70px; left: 16px; z-index: 35; min-height: 38px; display: flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-overlay); box-shadow: 0 8px 26px var(--shadow); color: var(--muted); font-size: 11px; cursor: pointer; backdrop-filter: blur(12px); }

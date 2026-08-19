@@ -26,14 +26,24 @@ export type DonnaConversationMessage = {
   createdAt: string;
 };
 
+export type DonnaSession = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export interface ProjectRuntimeRepository {
   getTicket(projectId: string, ticketId: string): TicketRuntimeState;
   setTicket(projectId: string, ticketId: string, state: TicketRuntimeState): void;
-  getDonnaThread(projectId: string): string | undefined;
-  setDonnaThread(projectId: string, threadId: string): void;
-  clearDonnaThread(projectId: string): void;
-  getDonnaMessages(projectId: string): DonnaConversationMessage[];
-  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">): DonnaConversationMessage;
+  getDonnaThread(projectId: string, sessionId?: string): string | undefined;
+  setDonnaThread(projectId: string, threadId: string, sessionId?: string): void;
+  clearDonnaThread(projectId: string, sessionId?: string): void;
+  getDonnaMessages(projectId: string, sessionId?: string): DonnaConversationMessage[];
+  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">, sessionId?: string): DonnaConversationMessage;
+  listDonnaSessions(projectId: string): DonnaSession[];
+  createDonnaSession(projectId: string, title?: string): DonnaSession;
+  clearDonnaSession(projectId: string, sessionId: string): void;
   getBlockerNotification(projectId: string, ticketId: string): string | undefined;
   setBlockerNotification(projectId: string, ticketId: string, ticketUpdatedAt: string): void;
   getRunnerThread(projectId: string, runnerId: string): string | undefined;
@@ -44,6 +54,7 @@ export class MemoryProjectRuntime implements ProjectRuntimeRepository {
   #tickets = new Map<string, TicketRuntimeState>();
   #donnaThreads = new Map<string, string>();
   #donnaMessages = new Map<string, DonnaConversationMessage[]>();
+  #donnaSessions = new Map<string, DonnaSession[]>();
   #blockerNotifications = new Map<string, string>();
   #runnerThreads = new Map<string, string>();
 
@@ -55,26 +66,51 @@ export class MemoryProjectRuntime implements ProjectRuntimeRepository {
     this.#tickets.set(key(projectId, ticketId), structuredClone(state));
   }
 
-  getDonnaThread(projectId: string): string | undefined {
-    return this.#donnaThreads.get(projectId);
+  getDonnaThread(projectId: string, sessionId = "default"): string | undefined {
+    return this.#donnaThreads.get(sessionKey(projectId, sessionId));
   }
 
-  setDonnaThread(projectId: string, threadId: string): void {
-    this.#donnaThreads.set(projectId, threadId);
+  setDonnaThread(projectId: string, threadId: string, sessionId = "default"): void {
+    this.#donnaThreads.set(sessionKey(projectId, sessionId), threadId);
   }
 
-  clearDonnaThread(projectId: string): void {
-    this.#donnaThreads.delete(projectId);
+  clearDonnaThread(projectId: string, sessionId = "default"): void {
+    this.#donnaThreads.delete(sessionKey(projectId, sessionId));
   }
 
-  getDonnaMessages(projectId: string): DonnaConversationMessage[] {
-    return structuredClone(this.#donnaMessages.get(projectId) ?? []);
+  getDonnaMessages(projectId: string, sessionId = "default"): DonnaConversationMessage[] {
+    return structuredClone(this.#donnaMessages.get(sessionKey(projectId, sessionId)) ?? []);
   }
 
-  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">): DonnaConversationMessage {
+  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">, sessionId = "default"): DonnaConversationMessage {
     const stored = { ...message, id: randomUUID(), createdAt: new Date().toISOString() };
-    this.#donnaMessages.set(projectId, [...(this.#donnaMessages.get(projectId) ?? []), stored]);
+    const keyName = sessionKey(projectId, sessionId);
+    this.#donnaMessages.set(keyName, [...(this.#donnaMessages.get(keyName) ?? []), stored]);
     return structuredClone(stored);
+  }
+
+  listDonnaSessions(projectId: string): DonnaSession[] {
+    const existing = this.#donnaSessions.get(projectId);
+    if (existing?.length) return structuredClone(existing);
+    const messages = this.getDonnaMessages(projectId);
+    const now = new Date(0).toISOString();
+    return [{ id: "default", title: "Main chat", createdAt: messages[0]?.createdAt ?? now, updatedAt: messages.at(-1)?.createdAt ?? now }];
+  }
+
+  createDonnaSession(projectId: string, title = "New chat"): DonnaSession {
+    const now = new Date().toISOString();
+    const session = { id: `donna-${randomUUID()}`, title: title.trim() || "New chat", createdAt: now, updatedAt: now };
+    this.#donnaSessions.set(projectId, [...this.listDonnaSessions(projectId), session]);
+    return structuredClone(session);
+  }
+
+  clearDonnaSession(projectId: string, sessionId: string): void {
+    this.clearDonnaThread(projectId, sessionId);
+    this.#donnaMessages.delete(sessionKey(projectId, sessionId));
+    const sessions = this.listDonnaSessions(projectId);
+    this.#donnaSessions.set(projectId, sessions.map(session => session.id === sessionId
+      ? { ...session, updatedAt: new Date().toISOString() }
+      : session));
   }
 
   getBlockerNotification(projectId: string, ticketId: string): string | undefined {
@@ -99,6 +135,7 @@ type RuntimeDocument = {
   tickets: Record<string, TicketRuntimeState>;
   donnaThreads: Record<string, string>;
   donnaMessages: Record<string, DonnaConversationMessage[]>;
+  donnaSessions: Record<string, DonnaSession[]>;
   blockerNotifications: Record<string, string>;
   runnerThreads: Record<string, string>;
 };
@@ -121,29 +158,57 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
     this.#persist();
   }
 
-  getDonnaThread(projectId: string): string | undefined {
-    return this.#document.donnaThreads[projectId];
+  getDonnaThread(projectId: string, sessionId = "default"): string | undefined {
+    return this.#document.donnaThreads[sessionKey(projectId, sessionId)];
   }
 
-  setDonnaThread(projectId: string, threadId: string): void {
-    this.#document.donnaThreads[projectId] = threadId;
+  setDonnaThread(projectId: string, threadId: string, sessionId = "default"): void {
+    this.#document.donnaThreads[sessionKey(projectId, sessionId)] = threadId;
     this.#persist();
   }
 
-  clearDonnaThread(projectId: string): void {
-    delete this.#document.donnaThreads[projectId];
+  clearDonnaThread(projectId: string, sessionId = "default"): void {
+    delete this.#document.donnaThreads[sessionKey(projectId, sessionId)];
     this.#persist();
   }
 
-  getDonnaMessages(projectId: string): DonnaConversationMessage[] {
-    return structuredClone(this.#document.donnaMessages[projectId] ?? []);
+  getDonnaMessages(projectId: string, sessionId = "default"): DonnaConversationMessage[] {
+    return structuredClone(this.#document.donnaMessages[sessionKey(projectId, sessionId)] ?? []);
   }
 
-  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">): DonnaConversationMessage {
+  appendDonnaMessage(projectId: string, message: Omit<DonnaConversationMessage, "id" | "createdAt">, sessionId = "default"): DonnaConversationMessage {
     const stored = { ...message, id: randomUUID(), createdAt: new Date().toISOString() };
-    this.#document.donnaMessages[projectId] = [...(this.#document.donnaMessages[projectId] ?? []), stored].slice(-500);
+    const keyName = sessionKey(projectId, sessionId);
+    this.#document.donnaMessages[keyName] = [...(this.#document.donnaMessages[keyName] ?? []), stored].slice(-500);
+    this.#touchDonnaSession(projectId, sessionId, stored.createdAt);
     this.#persist();
     return structuredClone(stored);
+  }
+
+  listDonnaSessions(projectId: string): DonnaSession[] {
+    const existing = this.#document.donnaSessions[projectId];
+    if (existing?.length) return structuredClone(existing);
+    const messages = this.getDonnaMessages(projectId);
+    const now = new Date(0).toISOString();
+    return [{ id: "default", title: "Main chat", createdAt: messages[0]?.createdAt ?? now, updatedAt: messages.at(-1)?.createdAt ?? now }];
+  }
+
+  createDonnaSession(projectId: string, title = "New chat"): DonnaSession {
+    const now = new Date().toISOString();
+    const session = { id: `donna-${randomUUID()}`, title: title.trim() || "New chat", createdAt: now, updatedAt: now };
+    this.#document.donnaSessions[projectId] = [...this.listDonnaSessions(projectId), session];
+    this.#persist();
+    return structuredClone(session);
+  }
+
+  clearDonnaSession(projectId: string, sessionId: string): void {
+    this.clearDonnaThread(projectId, sessionId);
+    delete this.#document.donnaMessages[sessionKey(projectId, sessionId)];
+    const now = new Date().toISOString();
+    this.#document.donnaSessions[projectId] = this.listDonnaSessions(projectId).map(session => (
+      session.id === sessionId ? { ...session, updatedAt: now } : session
+    ));
+    this.#persist();
   }
 
   getBlockerNotification(projectId: string, ticketId: string): string | undefined {
@@ -171,8 +236,16 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
     renameSync(temporary, this.filePath);
   }
 
+  #touchDonnaSession(projectId: string, sessionId: string, updatedAt: string): void {
+    const sessions = this.listDonnaSessions(projectId);
+    const current = sessions.find(session => session.id === sessionId);
+    if (current) current.updatedAt = updatedAt;
+    else sessions.push({ id: sessionId, title: sessionId === "default" ? "Main chat" : "New chat", createdAt: updatedAt, updatedAt });
+    this.#document.donnaSessions[projectId] = sessions;
+  }
+
   #load(): RuntimeDocument {
-    if (!existsSync(this.filePath)) return { version: 1, tickets: {}, donnaThreads: {}, donnaMessages: {}, blockerNotifications: {}, runnerThreads: {} };
+    if (!existsSync(this.filePath)) return { version: 1, tickets: {}, donnaThreads: {}, donnaMessages: {}, donnaSessions: {}, blockerNotifications: {}, runnerThreads: {} };
     const parsed = JSON.parse(readFileSync(this.filePath, "utf8")) as Partial<RuntimeDocument>;
     if (parsed.version !== 1 || !parsed.tickets || typeof parsed.tickets !== "object") {
       throw new Error(`Invalid Codex Runners runtime document at ${this.filePath}`);
@@ -182,10 +255,15 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
       tickets: parsed.tickets,
       donnaThreads: parsed.donnaThreads ?? {},
       donnaMessages: parsed.donnaMessages ?? loadLegacyDonnaMessages(path.dirname(this.filePath)),
+      donnaSessions: parsed.donnaSessions ?? {},
       blockerNotifications: parsed.blockerNotifications ?? {},
       runnerThreads: parsed.runnerThreads ?? {}
     };
   }
+}
+
+function sessionKey(projectId: string, sessionId: string): string {
+  return sessionId === "default" ? projectId : `${projectId}:${sessionId}`;
 }
 
 function key(projectId: string, ticketId: string): string {

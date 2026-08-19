@@ -201,9 +201,10 @@ export function createApp(dependencies: AppDependencies): Express {
 
   app.post("/api/projects/:projectId/donna", asyncRoute(async (request, response) => {
     if (!dependencies.donna) throw new Error("Donna is unavailable");
-    const body = request.body as { message?: unknown; source?: unknown };
+    const body = request.body as { message?: unknown; source?: unknown; sessionId?: unknown };
     if (typeof body.message !== "string" || body.message.trim().length === 0) throw new ZodError([]);
     const source: DonnaMessageSource = body.source === "terminal" || body.source === "mcp" ? body.source : "browser";
+    const sessionId = typeof body.sessionId === "string" && body.sessionId.trim().length > 0 ? body.sessionId : "default";
     const stream = request.accepts(["application/x-ndjson", "json"]) === "application/x-ndjson";
     if (stream) {
       response.status(200);
@@ -211,7 +212,7 @@ export function createApp(dependencies: AppDependencies): Express {
       response.setHeader("cache-control", "no-cache, no-transform");
       response.setHeader("x-accel-buffering", "no");
       response.flushHeaders();
-      for await (const event of dependencies.donna.send(requiredParam(request.params.projectId), body.message, source)) {
+      for await (const event of dependencies.donna.send(requiredParam(request.params.projectId), body.message, source, sessionId)) {
         response.write(`${JSON.stringify(event)}\n`);
         if (event.type === "error") break;
       }
@@ -220,7 +221,7 @@ export function createApp(dependencies: AppDependencies): Express {
     }
     const donnaEvents = [];
     let message = "";
-    for await (const event of dependencies.donna.send(requiredParam(request.params.projectId), body.message, source)) {
+    for await (const event of dependencies.donna.send(requiredParam(request.params.projectId), body.message, source, sessionId)) {
       donnaEvents.push(event);
       if (event.type === "completed") message = event.message;
       if (event.type === "error") throw new Error(event.message);
@@ -230,7 +231,28 @@ export function createApp(dependencies: AppDependencies): Express {
 
   app.get("/api/projects/:projectId/donna", asyncRoute(async (request, response) => {
     if (!dependencies.donna) throw new Error("Donna is unavailable");
-    response.json({ messages: dependencies.donna.history(requiredParam(request.params.projectId)) });
+    const sessionId = typeof request.query.sessionId === "string" && request.query.sessionId.trim().length > 0
+      ? request.query.sessionId
+      : "default";
+    response.json({ messages: dependencies.donna.history(requiredParam(request.params.projectId), sessionId) });
+  }));
+
+  app.get("/api/projects/:projectId/donna/sessions", asyncRoute(async (request, response) => {
+    if (!dependencies.donna) throw new Error("Donna is unavailable");
+    response.json({ sessions: dependencies.donna.sessions(requiredParam(request.params.projectId)) });
+  }));
+
+  app.post("/api/projects/:projectId/donna/sessions", asyncRoute(async (request, response) => {
+    if (!dependencies.donna) throw new Error("Donna is unavailable");
+    const body = request.body as { title?: unknown };
+    const title = typeof body.title === "string" ? body.title : undefined;
+    response.status(201).json({ session: dependencies.donna.createSession(requiredParam(request.params.projectId), title) });
+  }));
+
+  app.post("/api/projects/:projectId/donna/sessions/:sessionId/reset", asyncRoute(async (request, response) => {
+    if (!dependencies.donna) throw new Error("Donna is unavailable");
+    dependencies.donna.resetSession(requiredParam(request.params.projectId), requiredParam(request.params.sessionId));
+    response.json({ reset: true });
   }));
 
   app.post("/api/mcp/:toolName", asyncRoute(async (request, response) => {

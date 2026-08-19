@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../../../src/domain/types.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
-import type { DonnaConversationMessage, TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
+import type { DonnaConversationMessage, DonnaSession, TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
 import type { ProjectEvent } from "../../../src/server/event-bus.js";
 import type { CodexModelOption } from "../../../src/runners/codex-models.js";
 import { RunnersApi } from "../api/client.js";
@@ -15,6 +15,8 @@ export type ProjectState = {
   runners: RunnerRecord[];
   activity: ProjectEvent[];
   donnaMessages: DonnaConversationMessage[];
+  donnaSessions: DonnaSession[];
+  donnaSessionId: string;
   models: CodexModelOption[];
   deliveries: Record<string, TicketDeliveryState>;
   connected: boolean;
@@ -26,6 +28,9 @@ export type ProjectState = {
   setPoolMaximum(role: RoleName, maximum: number): Promise<void>;
   setDonnaModel(model: string): Promise<void>;
   messageDonna(message: string): Promise<string>;
+  selectDonnaSession(sessionId: string): Promise<void>;
+  newDonnaSession(): Promise<void>;
+  resetDonnaSession(): Promise<void>;
   mergeTicket(ticketId: string): Promise<void>;
   abortTicket(ticketId: string): Promise<void>;
 };
@@ -35,6 +40,8 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
   const [runners, setRunners] = useState<RunnerRecord[]>([]);
   const [activity, setActivity] = useState<ProjectEvent[]>([]);
   const [donnaMessages, setDonnaMessages] = useState<DonnaConversationMessage[]>([]);
+  const [donnaSessions, setDonnaSessions] = useState<DonnaSession[]>([]);
+  const [donnaSessionId, setDonnaSessionId] = useState(() => localStorage.getItem(`codex-runners:donna-session:${projectId}`) ?? "default");
   const [models, setModels] = useState<CodexModelOption[]>([]);
   const [deliveries, setDeliveries] = useState<Record<string, TicketDeliveryState>>({});
   const [connected, setConnected] = useState(false);
@@ -48,15 +55,21 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
     if (refreshing.current) return;
     refreshing.current = true;
     try {
-      const [nextProject, nextRunners, nextDonnaMessages, nextModels, nextDeliveries] = await Promise.all([
+      const [nextProject, nextRunners, nextSessions, nextModels, nextDeliveries] = await Promise.all([
         api.getProject(projectId),
         api.listRunners(projectId),
-        api.getDonnaMessages(projectId),
+        api.listDonnaSessions(projectId),
         api.listModels(),
         api.listDeliveries(projectId)
       ]);
+      const activeSessionId = nextSessions.some(session => session.id === donnaSessionId)
+        ? donnaSessionId
+        : nextSessions[0]?.id ?? "default";
+      const nextDonnaMessages = await api.getDonnaMessages(projectId, activeSessionId);
       setProject(nextProject);
       setRunners(nextRunners);
+      setDonnaSessions(nextSessions);
+      setDonnaSessionId(activeSessionId);
       setDonnaMessages(nextDonnaMessages);
       setModels(nextModels);
       setDeliveries(nextDeliveries);
@@ -67,7 +80,7 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
       setLoading(false);
       refreshing.current = false;
     }
-  }, [api, projectId]);
+  }, [api, donnaSessionId, projectId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
@@ -79,13 +92,13 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
       setActivity(current => [...current, event].slice(-80));
       if (event.type === "config.error" && typeof event.payload.message === "string") setError(event.payload.message);
       if (event.type === "donna.user" || event.type === "donna.completed" || event.type === "donna.blocker") {
-        void api.getDonnaMessages(projectId).then(setDonnaMessages);
+        void api.getDonnaMessages(projectId, donnaSessionId).then(setDonnaMessages);
       }
       if (event.type.startsWith("ticket.") || event.type.startsWith("runner.") || event.type === "project.updated") {
         void refresh();
       }
     }, setConnected);
-  }, [api, projectId, refresh]);
+  }, [api, donnaSessionId, projectId, refresh]);
 
   useEffect(() => {
     const poll = setInterval(() => {
@@ -156,18 +169,37 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
           source: "browser",
           createdAt: new Date().toISOString()
         }]);
-      });
+      }, donnaSessionId);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
       throw caught;
     } finally {
       try {
-        setDonnaMessages(await api.getDonnaMessages(projectId));
+        setDonnaMessages(await api.getDonnaMessages(projectId, donnaSessionId));
       } catch {
         // Preserve the original chat error and let polling recover the persisted history.
       }
     }
+  }, [api, donnaSessionId, projectId]);
+
+  const selectDonnaSession = useCallback(async (sessionId: string) => {
+    setDonnaSessionId(sessionId);
+    localStorage.setItem(`codex-runners:donna-session:${projectId}`, sessionId);
+    setDonnaMessages(await api.getDonnaMessages(projectId, sessionId));
   }, [api, projectId]);
+
+  const newDonnaSession = useCallback(async () => {
+    const session = await api.createDonnaSession(projectId);
+    setDonnaSessions(current => [...current, session]);
+    setDonnaSessionId(session.id);
+    localStorage.setItem(`codex-runners:donna-session:${projectId}`, session.id);
+    setDonnaMessages([]);
+  }, [api, projectId]);
+
+  const resetDonnaSession = useCallback(async () => {
+    await api.resetDonnaSession(projectId, donnaSessionId);
+    setDonnaMessages([]);
+  }, [api, donnaSessionId, projectId]);
 
   const mergeTicket = useCallback(async (ticketId: string) => {
     setDeliveries(current => {
@@ -195,5 +227,5 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
     }
   }, [api, project, projectId, refresh]);
 
-  return { project, runners, activity, donnaMessages, models, deliveries, connected, loading, error, refresh, moveTicket, saveTicket, setPoolMaximum, setDonnaModel, messageDonna, mergeTicket, abortTicket };
+  return { project, runners, activity, donnaMessages, donnaSessions, donnaSessionId, models, deliveries, connected, loading, error, refresh, moveTicket, saveTicket, setPoolMaximum, setDonnaModel, messageDonna, selectDonnaSession, newDonnaSession, resetDonnaSession, mergeTicket, abortTicket };
 }

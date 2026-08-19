@@ -139,10 +139,15 @@ export function App() {
           <DonnaRail
             projectName={state.project.project.name}
             messages={state.donnaMessages}
+            sessions={state.donnaSessions}
+            sessionId={state.donnaSessionId}
             model={state.project.donna?.model ?? "gpt-5.6-luna"}
             models={state.models}
             onModelChange={state.setDonnaModel}
             onSend={state.messageDonna}
+            onSelectSession={state.selectDonnaSession}
+            onNewSession={state.newDonnaSession}
+            onResetSession={state.resetDonnaSession}
             onCollapse={() => setDonnaOpen(false)}
           />
         )}

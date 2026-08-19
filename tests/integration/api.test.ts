@@ -5,6 +5,7 @@ import { createApp } from "../../src/server/app.js";
 import type { DonnaService } from "../../src/donna/donna-service.js";
 import { EventBus } from "../../src/server/event-bus.js";
 import { ProjectRegistry } from "../../src/server/project-registry.js";
+import { MemoryProjectRuntime } from "../../src/runtime/project-runtime.js";
 import { createInitializedProject } from "../helpers/initialized-project.js";
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -116,6 +117,46 @@ describe("Codex Runners API", () => {
       { type: "started", projectId: registered.project.id, source: "browser" },
       { type: "message", projectId: registered.project.id, text: "Checking the board." },
       { type: "completed", projectId: registered.project.id, message: "All tickets are moving." }
+    ]);
+  });
+
+  it("creates and resets Donna sessions without changing board tickets", async () => {
+    const project = await createInitializedProject();
+    cleanups.push(project.cleanup);
+    const events = new EventBus();
+    const registry = new ProjectRegistry(events);
+    const registered = await registry.register(project.root);
+    const runtime = new MemoryProjectRuntime();
+    const donna = {
+      history: (projectId: string, sessionId?: string) => runtime.getDonnaMessages(projectId, sessionId),
+      sessions: (projectId: string) => runtime.listDonnaSessions(projectId),
+      createSession: (projectId: string, title?: string) => runtime.createDonnaSession(projectId, title),
+      resetSession: (projectId: string, sessionId: string) => runtime.clearDonnaSession(projectId, sessionId),
+      async *send() {}
+    } as unknown as DonnaService;
+    const app = createApp({ registry, events, donna, version: "0.1.0" });
+    const createdTicket = await registry.createTicket(registered.project.id, {
+      title: "Keep this ticket",
+      status: "todo"
+    }, 1);
+
+    const created = await request(app)
+      .post(`/api/projects/${registered.project.id}/donna/sessions`)
+      .send({ title: "Fresh planning" })
+      .expect(201);
+    const listed = await request(app)
+      .get(`/api/projects/${registered.project.id}/donna/sessions`)
+      .expect(200);
+    await request(app)
+      .post(`/api/projects/${registered.project.id}/donna/sessions/${created.body.session.id}/reset`)
+      .expect(200);
+
+    expect(listed.body.sessions).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: "default", title: "Main chat" }),
+      expect.objectContaining({ id: created.body.session.id, title: "Fresh planning" })
+    ]));
+    expect(registry.getBoard(registered.project.id).tickets).toEqual([
+      expect.objectContaining({ id: createdTicket.ticket.id, title: "Keep this ticket", status: "todo" })
     ]);
   });
 });

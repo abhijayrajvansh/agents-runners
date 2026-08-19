@@ -2,7 +2,7 @@ import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../../../src
 import { ticketSearchScore } from "../../../src/domain/ticket-search.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 import type { AgentTerminalSnapshot } from "../../../src/orchestration/automation-manager.js";
-import type { DonnaConversationMessage, TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
+import type { DonnaConversationMessage, DonnaSession, TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
 import type { CodexModelOption } from "../../../src/runners/codex-models.js";
 import type { DonnaEvent } from "../../../src/donna/donna-service.js";
 
@@ -105,11 +105,11 @@ export class RunnersApi {
     );
   }
 
-  async messageDonna(projectId: string, message: string, onEvent?: (event: DonnaEvent) => void): Promise<string> {
+  async messageDonna(projectId: string, message: string, onEvent?: (event: DonnaEvent) => void, sessionId = "default"): Promise<string> {
     const response = await fetch(`/api/projects/${encodeURIComponent(projectId)}/donna`, {
       method: "POST",
       headers: { "accept": "application/x-ndjson", "content-type": "application/json" },
-      body: JSON.stringify({ message, source: "browser" })
+      body: JSON.stringify({ message, source: "browser", sessionId })
     });
     if (!response.ok) {
       const body = await response.json() as { error?: { message?: string } };
@@ -139,11 +139,33 @@ export class RunnersApi {
     return reply;
   }
 
-  async getDonnaMessages(projectId: string): Promise<DonnaConversationMessage[]> {
+  async getDonnaMessages(projectId: string, sessionId = "default"): Promise<DonnaConversationMessage[]> {
     const response = await this.#request<{ messages: DonnaConversationMessage[] }>(
-      `/api/projects/${encodeURIComponent(projectId)}/donna`
+      `/api/projects/${encodeURIComponent(projectId)}/donna?sessionId=${encodeURIComponent(sessionId)}`
     );
     return response.messages;
+  }
+
+  async listDonnaSessions(projectId: string): Promise<DonnaSession[]> {
+    const response = await this.#request<{ sessions: DonnaSession[] }>(
+      `/api/projects/${encodeURIComponent(projectId)}/donna/sessions`
+    );
+    return response.sessions;
+  }
+
+  async createDonnaSession(projectId: string, title = "New chat"): Promise<DonnaSession> {
+    const response = await this.#request<{ session: DonnaSession }>(
+      `/api/projects/${encodeURIComponent(projectId)}/donna/sessions`,
+      { method: "POST", body: JSON.stringify({ title }) }
+    );
+    return response.session;
+  }
+
+  async resetDonnaSession(projectId: string, sessionId: string): Promise<void> {
+    await this.#request(
+      `/api/projects/${encodeURIComponent(projectId)}/donna/sessions/${encodeURIComponent(sessionId)}/reset`,
+      { method: "POST" }
+    );
   }
 
   async #request<T>(url: string, init: RequestInit = {}): Promise<T> {

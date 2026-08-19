@@ -1,21 +1,27 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { ArrowUp, Check, ChevronDown, PanelLeftClose, Sparkles } from "lucide-react";
+import { ArrowUp, Check, ChevronDown, PanelLeftClose, Plus, RotateCcw, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
+import type { DonnaSession } from "../../../src/runtime/project-runtime.js";
 import type { CodexModelOption } from "../../../src/runners/codex-models.js";
 
 export type DonnaRailProps = {
   projectName: string;
   messages?: DonnaConversationMessage[];
+  sessions?: DonnaSession[];
+  sessionId?: string;
   model?: string;
   models?: CodexModelOption[];
   onModelChange?(model: string): Promise<void>;
   onSend(message: string): Promise<string>;
+  onSelectSession?(sessionId: string): Promise<void>;
+  onNewSession?(): Promise<void>;
+  onResetSession?(): Promise<void>;
   onCollapse(): void;
 };
 
-export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", models = [], onModelChange, onSend, onCollapse }: DonnaRailProps) {
+export function DonnaRail({ projectName, messages = [], sessions = [], sessionId = "default", model = "gpt-5.6-luna", models = [], onModelChange, onSend, onSelectSession, onNewSession, onResetSession, onCollapse }: DonnaRailProps) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
@@ -71,6 +77,19 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
         <div className="donna-mark"><Sparkles size={15} /></div>
         <div><strong>Donna</strong><span>{sending ? "Thinking" : "Available"}</span></div>
         <span className={`presence-dot ${sending ? "presence-dot--busy" : ""}`} />
+        <div className="donna-session-actions">
+          <select
+            aria-label="Donna chat session"
+            value={sessionId}
+            onChange={event => void onSelectSession?.(event.target.value)}
+            title="Switch Donna chat"
+          >
+            {sessions.length === 0 && <option value="default">Main chat</option>}
+            {sessions.map(session => <option key={session.id} value={session.id}>{session.title}</option>)}
+          </select>
+          <button type="button" className="donna-session-action" aria-label="New Donna chat" title="New Donna chat" onClick={() => void onNewSession?.()}><Plus size={14} /></button>
+          <button type="button" className="donna-session-action" aria-label="Reset Donna chat" title="Reset current Donna chat" onClick={() => void onResetSession?.()}><RotateCcw size={13} /></button>
+        </div>
         <button type="button" className="donna-collapse" aria-label="Collapse Donna (⌘B)" onClick={onCollapse} title="Collapse Donna (⌘B)">
           <PanelLeftClose size={15} />
         </button>
