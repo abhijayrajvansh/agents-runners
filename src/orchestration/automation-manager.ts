@@ -151,10 +151,11 @@ export class AutomationManager {
     const runtime = this.runtimeFor(config);
     return Object.fromEntries(config.board.tickets.map(ticket => {
       const state = runtime.getTicket(projectId, ticket.id);
+      const mergeState = state.mergeState ?? (state.integrationCommit ? "merged" : undefined);
       return [ticket.id, {
         ...(state.deliveryBranch ? { deliveryBranch: state.deliveryBranch } : {}),
         ...(state.integrationCommit ? { integrationCommit: state.integrationCommit } : {}),
-        ...(state.mergeState ? { mergeState: state.mergeState } : {}),
+        ...(mergeState ? { mergeState } : {}),
         ...(state.mergeError ? { mergeError: state.mergeError } : {})
       }];
     }));
