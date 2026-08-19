@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { TerminalSquare } from "lucide-react";
+import { Check, Copy, TerminalSquare } from "lucide-react";
 
 import type { AgentTerminalSnapshot } from "../../../src/orchestration/automation-manager.js";
 import { RunnersApi } from "../api/client.js";
@@ -57,14 +57,25 @@ export function AgentTerminals({ projectId }: { projectId: string }) {
 
 function TerminalCard({ terminal }: { terminal: AgentTerminalSnapshot }) {
   const output = useRef<HTMLPreElement>(null);
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     if (output.current) output.current.scrollTop = output.current.scrollHeight;
   }, [terminal.output]);
+  const copyAttachCommand = async () => {
+    await navigator.clipboard.writeText(terminal.attachCommand);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1_500);
+  };
   return (
     <section className="terminal-card" data-status={terminal.status}>
       <header>
         <div className="terminal-identity"><span>{iconFor(terminal.role)}</span><div><strong>{terminal.id}</strong><small>{terminal.role}</small></div></div>
-        <div className="terminal-state"><i /><span>{terminal.status}</span></div>
+        <div className="terminal-header-actions">
+          <button type="button" className="terminal-copy" title={terminal.attachCommand} aria-label={`Copy attach command for ${terminal.id}`} onClick={() => void copyAttachCommand()}>
+            {copied ? <Check size={13} /> : <Copy size={13} />}<span>{copied ? "Copied" : "Attach"}</span>
+          </button>
+          <div className="terminal-state"><i /><span>{terminal.status}</span></div>
+        </div>
       </header>
       <div className="terminal-context">
         <span>{terminal.ticketId ?? "Waiting for work"}</span>

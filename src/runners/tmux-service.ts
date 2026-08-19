@@ -25,8 +25,18 @@ export type TmuxJob = {
   completion: Promise<number>;
 };
 
+export type InteractiveCodexSpec = {
+  command: string;
+  worktreePath: string;
+  model?: string;
+  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
+  fullAccess: boolean;
+  env?: Record<string, string>;
+};
+
 export class TmuxService {
   readonly commands: CommandRunner;
+  readonly #interactiveStarts = new Map<string, Promise<void>>();
 
   constructor(commands: CommandRunner) {
     this.commands = commands;
@@ -62,6 +72,14 @@ export class TmuxService {
     return { id, eventFile, exitFile, completion: waitForExit(exitFile) };
   }
 
+  async ensureInteractiveCodex(pane: TmuxPane, spec: InteractiveCodexSpec): Promise<void> {
+    const pending = this.#interactiveStarts.get(pane.target);
+    if (pending) return pending;
+    const start = this.#startInteractiveCodex(pane, spec).finally(() => this.#interactiveStarts.delete(pane.target));
+    this.#interactiveStarts.set(pane.target, start);
+    return start;
+  }
+
   async listWindows(session: string): Promise<string[]> {
     const result = await this.commands.run("tmux", ["list-windows", "-t", session, "-F", "#{window_name}"]);
     return result.stdout.split(/\r?\n/).filter(Boolean);
@@ -80,10 +98,29 @@ export class TmuxService {
     return result.stdout;
   }
 
-  async inspectPane(target: string): Promise<{ command: string; pid: number }> {
-    const result = await this.commands.run("tmux", ["list-panes", "-t", target, "-F", "#{pane_current_command}\t#{pane_pid}"]);
-    const [command = "shell", pid = "0"] = result.stdout.trim().split("\t");
-    return { command, pid: Number.parseInt(pid, 10) || 0 };
+  async inspectPane(target: string): Promise<{ command: string; pid: number; cwd: string }> {
+    const result = await this.commands.run("tmux", ["list-panes", "-t", target, "-F", "#{pane_current_command}\t#{pane_pid}\t#{pane_current_path}"]);
+    const [command = "shell", pid = "0", cwd = ""] = result.stdout.trim().split("\t");
+    return { command, pid: Number.parseInt(pid, 10) || 0, cwd };
+  }
+
+  async #startInteractiveCodex(pane: TmuxPane, spec: InteractiveCodexSpec): Promise<void> {
+    const current = await this.inspectPane(pane.target);
+    if (!isShellCommand(current.command)) return;
+    const environment = Object.entries(spec.env ?? {})
+      .map(([key, value]) => `${key}=${shellQuote(value)}`)
+      .join(" ");
+    const args = [
+      ...(spec.model ? ["--model", spec.model] : []),
+      ...(spec.reasoningEffort ? ["--config", `model_reasoning_effort=${JSON.stringify(spec.reasoningEffort)}`] : []),
+      ...(spec.fullAccess ? ["--dangerously-bypass-approvals-and-sandbox"] : []),
+      "--no-alt-screen",
+      "-C",
+      spec.worktreePath
+    ];
+    const command = [shellQuote(spec.command), ...args.map(shellQuote)].join(" ");
+    await this.commands.run("tmux", ["send-keys", "-t", pane.target, "-l", `${environment ? `${environment} ` : ""}${command}`]);
+    await this.commands.run("tmux", ["send-keys", "-t", pane.target, "Enter"]);
   }
 
   async #hasSession(session: string): Promise<boolean> {
@@ -95,6 +132,10 @@ export class TmuxService {
       throw error;
     }
   }
+}
+
+function isShellCommand(command: string): boolean {
+  return ["bash", "dash", "fish", "ksh", "sh", "shell", "zsh"].includes(command);
 }
 
 async function waitForExit(file: string): Promise<number> {

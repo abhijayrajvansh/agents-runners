@@ -183,6 +183,9 @@ kbd { display: inline-flex; align-items: center; gap: 1px; margin-left: 7px; pad
 .terminal-card[data-status="working"] { border-color: #b8d4c5; }
 .terminal-card[data-status="unhealthy"] { border-color: #e4b6b1; }
 .terminal-card > header { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 13px; border-bottom: 1px solid var(--line); }
+.terminal-header-actions { display: flex; align-items: center; gap: 10px; }
+.terminal-copy { min-height: 27px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid var(--line); border-radius: 7px; background: white; color: var(--muted); font-size: 9px; cursor: pointer; }
+.terminal-copy:hover { border-color: var(--line-strong); background: var(--soft); color: var(--ink); }
 .terminal-identity { min-width: 0; display: flex; align-items: center; gap: 10px; }
 .terminal-identity > span { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 8px; background: var(--soft); font-size: 14px; }
 .terminal-identity > div { min-width: 0; display: flex; flex-direction: column; }

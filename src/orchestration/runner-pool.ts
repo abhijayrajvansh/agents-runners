@@ -10,6 +10,7 @@ export type RunnerRecord = {
   worktreePath: string;
   branch: string;
   tmuxTarget: string;
+  consoleTmuxTarget?: string;
   threadId?: string;
   ticketId?: string;
 };

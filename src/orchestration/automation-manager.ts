@@ -30,6 +30,7 @@ export type AgentTerminalSnapshot = {
   command: string;
   pid: number;
   output: string;
+  attachCommand: string;
 };
 
 export class AutomationManager {
@@ -60,15 +61,29 @@ export class AutomationManager {
     for (const role of ["developer", "reviewer", "qa"] as const) {
       pools.set(role, new RunnerPool(role, config.pools[role].max, async (createdRole, slot) => {
         const worktree = await this.worktrees.ensureRunner(config, createdRole, slot);
-        const pane = await this.tmux.ensurePane({
+        const consolePane = await this.tmux.ensurePane({
           session: sessionName(projectId),
           window: worktree.id,
+          cwd: worktree.worktreePath
+        });
+        await this.tmux.ensureInteractiveCodex(consolePane, {
+          command: this.codex.codexCommand,
+          worktreePath: worktree.worktreePath,
+          model: config.pools[createdRole].model ?? "gpt-5.6-sol",
+          reasoningEffort: config.pools[createdRole].reasoningEffort ?? "medium",
+          fullAccess: config.automation.fullAccess,
+          env: { CODEX_RUNNERS_PROJECT_ROOT: config.project.repositoryRoot }
+        });
+        const automationPane = await this.tmux.ensurePane({
+          session: sessionName(projectId),
+          window: `${worktree.id}-automation`,
           cwd: worktree.worktreePath
         });
         const runner: RunnerRecord = {
           ...worktree,
           status: "idle",
-          tmuxTarget: pane.target
+          tmuxTarget: automationPane.target,
+          consoleTmuxTarget: consolePane.target
         };
         const threadId = runtime.getRunnerThread(projectId, runner.id);
         if (threadId) runner.threadId = threadId;
@@ -92,6 +107,7 @@ export class AutomationManager {
     const heartbeat = setInterval(() => this.reconcile(projectId), 2_000);
     heartbeat.unref();
     this.#projects.set(projectId, { runtime, pools, scheduler, unsubscribe, heartbeat });
+    void this.#hydrateInteractiveWindows(projectId, config);
     for (const ticket of config.board.tickets.filter(candidate => candidate.status === "blocked")) {
       this.#notifyBlocker(projectId, ticket);
     }
@@ -127,11 +143,11 @@ export class AutomationManager {
     const session = sessionName(projectId);
     const windows = await this.tmux.listWindows(session).catch(() => []);
     const runners = new Map(this.list(projectId).map(runner => [runner.id, runner]));
-    return Promise.all(windows.map(async id => {
+    return Promise.all(windows.filter(id => !id.endsWith("-automation")).map(async id => {
       const target = `${session}:${id}`;
       const runner = runners.get(id);
       const [pane, output] = await Promise.all([
-        this.tmux.inspectPane(target).catch(() => ({ command: "unavailable", pid: 0 })),
+        this.tmux.inspectPane(target).catch(() => ({ command: "unavailable", pid: 0, cwd: "" })),
         this.tmux.capturePane(target).catch(() => "Terminal output is temporarily unavailable.")
       ]);
       return {
@@ -141,8 +157,28 @@ export class AutomationManager {
         ...(runner?.ticketId ? { ticketId: runner.ticketId } : {}),
         command: pane.command,
         pid: pane.pid,
-        output: stripTerminalControl(output).trimEnd()
+        output: stripTerminalControl(output).trimEnd(),
+        attachCommand: `tmux attach -t ${target}`
       };
+    }));
+  }
+
+  async #hydrateInteractiveWindows(projectId: string, config: ProjectConfig): Promise<void> {
+    const session = sessionName(projectId);
+    const windows = await this.tmux.listWindows(session).catch(() => []);
+    await Promise.all(windows.filter(id => id !== "donna" && !id.endsWith("-automation")).map(async id => {
+      const role = roleFromRunnerId(id);
+      const target = `${session}:${id}`;
+      const state = await this.tmux.inspectPane(target).catch(() => undefined);
+      if (!state?.cwd) return;
+      await this.tmux.ensureInteractiveCodex({ session, window: id, target, cwd: state.cwd }, {
+        command: this.codex.codexCommand,
+        worktreePath: state.cwd,
+        model: config.pools[role].model ?? "gpt-5.6-sol",
+        reasoningEffort: config.pools[role].reasoningEffort ?? "medium",
+        fullAccess: config.automation.fullAccess,
+        env: { CODEX_RUNNERS_PROJECT_ROOT: config.project.repositoryRoot }
+      });
     }));
   }
 
