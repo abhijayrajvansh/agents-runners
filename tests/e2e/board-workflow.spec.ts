@@ -19,6 +19,7 @@ test("creates, starts, and autonomously completes a ticket with Donna available"
   await drawer.getByRole("button", { name: "Create ticket" }).click();
   await expect(page.getByRole("region", { name: "Backlog" })).toContainText("Ship account recovery");
 
+  await page.getByRole("button", { name: "Compact" }).click();
   await page.getByRole("button", { name: "Move Ship account recovery to Todo" }).click();
   await expect(page.getByRole("region", { name: "Done" })).toContainText("Ship account recovery");
 

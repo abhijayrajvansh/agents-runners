@@ -1,4 +1,4 @@
-import { watch as watchFile, type FSWatcher } from "node:fs";
+import { unwatchFile, watchFile } from "node:fs";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -81,7 +81,6 @@ export class AtomicJsonStore<T extends RevisionedDocument> {
   }
 
   watch(listener: (document: T) => void, onError?: (error: unknown) => void): () => void {
-    let watcher: FSWatcher | undefined;
     let timer: NodeJS.Timeout | undefined;
     const notify = () => {
       if (timer) clearTimeout(timer);
@@ -89,14 +88,12 @@ export class AtomicJsonStore<T extends RevisionedDocument> {
         void this.load().then(listener).catch(error => onError?.(error));
       }, 25);
     };
-    const filename = path.basename(this.filePath);
-    watcher = watchFile(path.dirname(this.filePath), { persistent: false }, (_event, changed) => {
-      if (changed === null || changed.toString() === filename) notify();
-    });
+    const fileListener = () => notify();
+    watchFile(this.filePath, { persistent: false, interval: 50 }, fileListener);
 
     return () => {
       if (timer) clearTimeout(timer);
-      watcher?.close();
+      unwatchFile(this.filePath, fileListener);
     };
   }
 

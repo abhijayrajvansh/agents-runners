@@ -33,7 +33,8 @@ const donna = {
   async *send(projectId: string) {
     yield { type: "message" as const, projectId, text: "I’ll coordinate that with the runner team." };
     yield { type: "completed" as const, projectId, message: "I’ll coordinate that with the runner team." };
-  }
+  },
+  history: () => []
 } as unknown as DonnaService;
 const processing = new Set<string>();
 events.subscribe(project.project.id, event => {

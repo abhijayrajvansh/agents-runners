@@ -37,8 +37,10 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const sequence = useRef(0);
+  const errorGeneration = useRef(0);
 
   const refresh = useCallback(async () => {
+    const startedWithErrorGeneration = errorGeneration.current;
     try {
       const [nextProject, nextRunners, nextDonnaMessages, nextModels] = await Promise.all([
         api.getProject(projectId),
@@ -50,7 +52,7 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
       setRunners(nextRunners);
       setDonnaMessages(nextDonnaMessages);
       setModels(nextModels);
-      setError(null);
+      if (errorGeneration.current === startedWithErrorGeneration) setError(null);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
@@ -63,7 +65,10 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
   useEffect(() => connectProjectSocket(projectId, sequence.current, event => {
     sequence.current = Math.max(sequence.current, event.sequence);
     setActivity(current => [...current, event].slice(-80));
-    if (event.type === "config.error" && typeof event.payload.message === "string") setError(event.payload.message);
+    if (event.type === "config.error" && typeof event.payload.message === "string") {
+      errorGeneration.current += 1;
+      setError(event.payload.message);
+    }
     if (event.type === "donna.user" || event.type === "donna.completed" || event.type === "donna.blocker") {
       void api.getDonnaMessages(projectId).then(setDonnaMessages);
     }
