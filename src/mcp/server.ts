@@ -17,18 +17,114 @@ export type McpToolCaller = (name: McpToolName, input: Record<string, unknown>) 
 export function createMcpServer(callTool: McpToolCaller): McpServer {
   const server = new McpServer({ name: "codex-runners", version: "0.1.0" });
   for (const name of MCP_TOOL_NAMES) {
+    const inputSchema = inputSchemaFor(name) as z.ZodObject<any>;
     server.registerTool(name, {
       description: descriptionFor(name),
-      inputSchema: z.object({ projectRoot: z.string().optional() }).loose()
-    }, async input => {
+      inputSchema
+    }, async (input: Record<string, unknown>) => {
       const result = await callTool(name, input);
       return {
-        content: [{ type: "text", text: JSON.stringify(result) }],
+        content: [{ type: "text" as const, text: JSON.stringify(result) }],
         structuredContent: objectResult(result)
       };
     });
   }
   return server;
+}
+
+const projectRoot = z.string().min(1).optional().describe("Absolute project root. Omit to use the configured project root.");
+const expectedRevision = z.number().int().nonnegative().describe("Latest board revision returned by get_board.");
+const ticketStatus = z.enum(["backlog", "todo", "in_progress", "qa", "review", "blocked"]);
+const runnerRole = z.enum(["developer", "reviewer", "qa"]);
+const ticketInput = z.object({
+  id: z.string().min(1).optional(),
+  title: z.string().min(1),
+  kind: z.enum(["issue", "spec", "ticket", "decision", "map"]).optional(),
+  source: z.enum(["manual", "triage", "to_spec", "to_tickets", "wayfinder", "donna"]).optional(),
+  category: z.enum(["bug", "enhancement"]).optional(),
+  description: z.string().optional(),
+  acceptanceCriteria: z.array(z.string()).optional(),
+  status: ticketStatus,
+  priority: z.enum(["low", "medium", "high", "critical"]).optional(),
+  type: z.enum(["feature", "bug", "test", "review", "chore"]).optional(),
+  tags: z.array(z.string()).optional(),
+  comments: z.array(z.object({
+    id: z.string().min(1),
+    author: z.string().min(1),
+    body: z.string().min(1),
+    createdAt: z.iso.datetime()
+  })).optional(),
+  dependencies: z.array(z.string()).optional(),
+  blocker: z.object({
+    kind: z.enum(["dependency", "human_input"]),
+    reason: z.string().min(1),
+    question: z.string().min(1).optional(),
+    recommendedAction: z.string().min(1).optional(),
+    autoResumeAt: z.iso.datetime().optional()
+  }).nullable().optional(),
+  preferredRole: runnerRole.optional(),
+  assignedRunnerId: z.string().nullable().optional(),
+  developmentInstructions: z.string().optional(),
+  qaInstructions: z.string().optional(),
+  environment: z.string().optional()
+}).strict();
+
+function inputSchemaFor(name: McpToolName) {
+  switch (name) {
+    case "get_project":
+    case "get_board":
+    case "list_runners":
+    case "get_activity":
+      return z.object({
+        projectRoot,
+        ...(name === "get_activity" ? { since: z.number().int().nonnegative().optional() } : {})
+      }).strict();
+    case "get_ticket":
+      return z.object({ projectRoot, ticketId: z.string().min(1) }).strict();
+    case "create_ticket":
+      return z.object({ projectRoot, expectedRevision, ticket: ticketInput }).strict();
+    case "update_ticket":
+      return z.object({
+        projectRoot,
+        ticketId: z.string().min(1),
+        expectedRevision,
+        patch: ticketInput.partial().strict()
+      }).strict();
+    case "move_ticket":
+      return z.object({ projectRoot, ticketId: z.string().min(1), status: ticketStatus, expectedRevision }).strict();
+    case "assign_ticket":
+      return z.object({
+        projectRoot,
+        ticketId: z.string().min(1),
+        runnerId: z.string().min(1),
+        expectedRevision
+      }).strict();
+    case "claim_next_ticket":
+      return z.object({ projectRoot, runnerId: z.string().min(1), expectedRevision }).strict();
+    case "add_ticket_comment":
+      return z.object({
+        projectRoot,
+        ticketId: z.string().min(1),
+        author: z.string().min(1),
+        body: z.string().min(1),
+        expectedRevision
+      }).strict();
+    case "report_progress":
+    case "complete_stage":
+      return z.object({
+        projectRoot,
+        ticketId: z.string().min(1).optional(),
+        runnerId: z.string().min(1).optional(),
+        expectedRevision,
+        message: z.string().optional(),
+        outcome: z.string().optional(),
+        findings: z.array(z.string()).optional()
+      }).strict();
+    case "get_runner":
+      return z.object({ projectRoot, runnerId: z.string().min(1) }).strict();
+    case "message_donna":
+      return z.object({ projectRoot, message: z.string().min(1) }).strict();
+  }
 }
 
 export async function runStdioMcpServer(
@@ -65,8 +161,8 @@ function descriptionFor(name: McpToolName): string {
     get_ticket: "Read one issue by ID.",
     create_ticket: "Create a revision-protected issue (spec, ticket, or decision).",
     update_ticket: "Update issue fields using the expected board revision.",
-    move_ticket: "Move an issue through Backlog, Todo, In progress, QA, Review, or Blocked.",
-    assign_ticket: "Assign an issue to a persistent runner ID.",
+    move_ticket: "Move an issue through Backlog, Todo, In progress, QA, Review, or Blocked. Use the latest expectedRevision.",
+    assign_ticket: "Assign an issue to a persistent runner ID such as developer-01 using the latest expectedRevision.",
     claim_next_ticket: "Claim the next dependency-ready Todo issue.",
     add_ticket_comment: "Append a visible comment to an issue.",
     report_progress: "Publish a redacted live progress event for a ticket.",

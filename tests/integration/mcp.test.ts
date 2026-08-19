@@ -28,6 +28,24 @@ describe("Codex Runners MCP tools", () => {
 
     const listed = await client.listTools();
     expect(listed.tools.map(tool => tool.name)).toEqual([...MCP_TOOL_NAMES]);
+    const createTicketTool = listed.tools.find(tool => tool.name === "create_ticket");
+    expect(createTicketTool?.inputSchema).toMatchObject({
+      required: expect.arrayContaining(["expectedRevision", "ticket"]),
+      properties: expect.objectContaining({
+        expectedRevision: expect.any(Object),
+        ticket: expect.objectContaining({
+          properties: expect.objectContaining({
+            status: expect.objectContaining({
+              enum: ["backlog", "todo", "in_progress", "qa", "review", "blocked"]
+            })
+          })
+        })
+      })
+    });
+    const assignTicketTool = listed.tools.find(tool => tool.name === "assign_ticket");
+    expect(assignTicketTool?.inputSchema.required).toEqual(
+      expect.arrayContaining(["ticketId", "runnerId", "expectedRevision"])
+    );
     const called = await client.callTool({ name: "get_board", arguments: { projectRoot: "/tmp/demo" } });
     expect(called.structuredContent).toEqual({ projectRoot: "/tmp/demo", revision: 7 });
     expect(calls).toEqual(["get_board"]);

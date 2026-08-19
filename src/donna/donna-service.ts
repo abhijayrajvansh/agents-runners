@@ -248,13 +248,17 @@ function parseWorkRequest(message: string): { title: string; planningOnly: boole
   const text = message.trim();
   const lower = text.toLowerCase();
   const imperative = /^(?:please\s+)?(?:can you\s+|could you\s+)?(build|create|implement|add|develop|make|fix|repair|update|refactor)\b/i.exec(text);
-  if (!imperative) return null;
-  const verb = imperative[1]?.toLowerCase() ?? "build";
+  const ticketRequest = /\b(?:build|create|write)\s+(?:a\s+)?ticket\b/i.test(text);
+  if (!imperative && !ticketRequest) return null;
+  const verb = imperative?.[1]?.toLowerCase()
+    ?? (/\b(?:fix|repair)\b/i.test(text) ? "fix" : "build");
   const planningOnly = /\b(backlog|planning only|do not start|don't start)\b/i.test(text);
   const urgent = /\b(as fast as possible|asap|urgent|immediately|right now|quick)\b/i.test(text);
   const type = verb === "fix" || verb === "repair" ? "bug" as const : verb === "refactor" || verb === "update" ? "chore" as const : "feature" as const;
   const subject = text
     .replace(/^(?:please\s+)?(?:can you\s+|could you\s+)?(?:build|create|implement|add|develop|make|fix|repair|update|refactor)(?:\s+me)?\s+/i, "")
+    .replace(/^(?:a\s+)?ticket\s+(?:for|to)\s+/i, "")
+    .replace(/^.*?\b(?:build|create|write)\s+(?:a\s+)?ticket\s+(?:for|to)\s+/i, "")
     .replace(/\s+(?:as fast as possible|asap|immediately|right now)[.!?]*$/i, "")
     .replace(/[.!?]+$/g, "")
     .trim();

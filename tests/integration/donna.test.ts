@@ -74,6 +74,36 @@ describe("DonnaService", () => {
       ["Create a backlog idea for audit logging", "backlog"]
     ]);
   });
+
+  it("turns a natural-language ticket request into a Todo ticket without invoking Codex", async () => {
+    const initialized = await createInitializedProject();
+    cleanups.push(initialized.cleanup);
+    const events = new EventBus();
+    const registry = new ProjectRegistry(events);
+    const project = await registry.register(initialized.root);
+    const runtime = new MemoryProjectRuntime();
+    const codex = { runTurn: vi.fn() };
+    const tmux = {
+      ensurePane: vi.fn(async ({ session, window, cwd }) => ({ session, window, cwd, target: `${session}:${window}` }))
+    };
+    const donna = new DonnaService({ registry, events, codex, tmux, runtimeFor: () => runtime });
+
+    const response = await collect(donna.send(
+      project.project.id,
+      "We need to improve the CLI start flow. Build ticket for this task using superpowers.",
+      "browser"
+    ));
+
+    expect(codex.runTurn).not.toHaveBeenCalled();
+    expect(registry.getBoard(project.project.id).tickets).toEqual([
+      expect.objectContaining({
+        status: "todo",
+        source: "donna",
+        title: expect.stringContaining("Build")
+      })
+    ]);
+    expect(response.at(-1)).toMatchObject({ type: "completed" });
+  });
 });
 
 async function collect(iterable: AsyncIterable<DonnaEvent>): Promise<DonnaEvent[]> {
