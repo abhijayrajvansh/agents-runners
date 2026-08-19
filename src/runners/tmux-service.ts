@@ -14,6 +14,9 @@ export type TmuxJobSpec = {
   command: string;
   args: string[];
   runtimeDirectory: string;
+  // Agent CLIs differ on how they take a working directory, so the job script
+  // always enters the worktree before launching one.
+  cwd?: string;
   stdin?: string;
   env?: Record<string, string>;
 };
@@ -25,13 +28,11 @@ export type TmuxJob = {
   completion: Promise<number>;
 };
 
-export type InteractiveCodexSpec = {
+// The interactive console pane is provider-agnostic: the caller supplies argv
+// already built by the agent provider.
+export type InteractiveAgentSpec = {
   command: string;
-  worktreePath: string;
-  model?: string;
-  reasoningEffort?: "low" | "medium" | "high" | "xhigh" | "max" | "ultra";
-  fullAccess: boolean;
-  configOverrides?: string[];
+  args: string[];
   env?: Record<string, string>;
 };
 
@@ -65,7 +66,8 @@ export class TmuxService {
       .join(" ");
     const command = [shellQuote(spec.command), ...spec.args.map(shellQuote)].join(" ");
     const redirect = spec.stdin !== undefined ? ` < ${shellQuote(inputFile)}` : "";
-    const script = `#!/bin/bash\nset +e\n${environment ? `${environment} ` : ""}${command}${redirect} 2>&1 | tee -a ${shellQuote(eventFile)}\ncode=\${PIPESTATUS[0]}\nprintf '{\"exitCode\":%s}\\n' "$code" > ${shellQuote(exitFile)}\nexit 0\n`;
+    const enter = spec.cwd ? `cd ${shellQuote(spec.cwd)} || exit 1\n` : "";
+    const script = `#!/bin/bash\nset +e\n${enter}${environment ? `${environment} ` : ""}${command}${redirect} 2>&1 | tee -a ${shellQuote(eventFile)}\ncode=\${PIPESTATUS[0]}\nprintf '{\"exitCode\":%s}\\n' "$code" > ${shellQuote(exitFile)}\nexit 0\n`;
     await writeFile(scriptFile, script, { encoding: "utf8", mode: 0o700 });
     await chmod(scriptFile, 0o700);
     await this.commands.run("tmux", ["send-keys", "-t", pane.target, "-l", `bash ${shellQuote(scriptFile)}`]);
@@ -73,10 +75,10 @@ export class TmuxService {
     return { id, eventFile, exitFile, completion: waitForExit(exitFile) };
   }
 
-  async ensureInteractiveCodex(pane: TmuxPane, spec: InteractiveCodexSpec): Promise<void> {
+  async ensureInteractiveAgent(pane: TmuxPane, spec: InteractiveAgentSpec): Promise<void> {
     const pending = this.#interactiveStarts.get(pane.target);
     if (pending) return pending;
-    const start = this.#startInteractiveCodex(pane, spec).finally(() => this.#interactiveStarts.delete(pane.target));
+    const start = this.#startInteractiveAgent(pane, spec).finally(() => this.#interactiveStarts.delete(pane.target));
     this.#interactiveStarts.set(pane.target, start);
     return start;
   }
@@ -105,22 +107,13 @@ export class TmuxService {
     return { command, pid: Number.parseInt(pid, 10) || 0, cwd };
   }
 
-  async #startInteractiveCodex(pane: TmuxPane, spec: InteractiveCodexSpec): Promise<void> {
+  async #startInteractiveAgent(pane: TmuxPane, spec: InteractiveAgentSpec): Promise<void> {
     const current = await this.inspectPane(pane.target);
     if (!isShellCommand(current.command)) return;
     const environment = Object.entries(spec.env ?? {})
       .map(([key, value]) => `${key}=${shellQuote(value)}`)
       .join(" ");
-    const args = [
-      ...(spec.model ? ["--model", spec.model] : []),
-      ...(spec.reasoningEffort ? ["--config", `model_reasoning_effort=${JSON.stringify(spec.reasoningEffort)}`] : []),
-      ...(spec.configOverrides ?? []).flatMap(value => ["--config", value]),
-      ...(spec.fullAccess ? ["--dangerously-bypass-approvals-and-sandbox"] : []),
-      "--no-alt-screen",
-      "-C",
-      spec.worktreePath
-    ];
-    const command = [shellQuote(spec.command), ...args.map(shellQuote)].join(" ");
+    const command = [shellQuote(spec.command), ...spec.args.map(shellQuote)].join(" ");
     await this.commands.run("tmux", ["send-keys", "-t", pane.target, "-l", `${environment ? `${environment} ` : ""}${command}`]);
     await this.commands.run("tmux", ["send-keys", "-t", pane.target, "Enter"]);
   }

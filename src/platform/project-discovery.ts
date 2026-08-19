@@ -62,8 +62,8 @@ export async function ensureRepository(inputPath: string, integrationBranch = "d
     await git(repositoryRoot, ["rev-parse", "--verify", "HEAD"]);
   } catch {
     await git(repositoryRoot, [
-      "-c", "user.name=Codex Runners",
-      "-c", "user.email=codex-runners@localhost",
+      "-c", "user.name=Agents Runners",
+      "-c", "user.email=agents-runners@localhost",
       "commit", "--allow-empty", "-m", "chore: initialize project"
     ]);
   }

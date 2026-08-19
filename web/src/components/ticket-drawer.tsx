@@ -120,7 +120,7 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
               <div className="human-input-panel__recommendation">
                 <span>Recommended solution</span>
                 <strong>{recommendedAction}</strong>
-                {autoResumeAt && <p>If you do not answer by {formatDecisionDeadline(autoResumeAt)}, Codex Runners will apply this recommendation automatically.</p>}
+                {autoResumeAt && <p>If you do not answer by {formatDecisionDeadline(autoResumeAt)}, Agents Runners will apply this recommendation automatically.</p>}
               </div>
               <label>Your answer<textarea value={humanInput} onChange={event => setHumanInput(event.target.value)} rows={4} placeholder={recommendedAction} required /></label>
               <small>Saving your response moves this ticket to Todo and resumes its persistent agent automatically.</small>

@@ -13,7 +13,7 @@ afterEach(async () => {
   await Promise.all(cleanups.splice(0).map(cleanup => cleanup()));
 });
 
-describe("Codex Runners API", () => {
+describe("Agents Runners API", () => {
   it("registers a project and returns its current board", async () => {
     const project = await createInitializedProject();
     cleanups.push(project.cleanup);

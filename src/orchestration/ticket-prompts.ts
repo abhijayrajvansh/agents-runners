@@ -12,7 +12,7 @@ export function buildStagePrompt(
     developer: [
       "Implement this vertical-slice ticket in the persistent worktree.",
       "Use the bundled /tdd and /code-review skills: write a failing test at the agreed seam, make it pass, and review the diff before committing.",
-      "Run the relevant verification, commit every completed change on this runner branch, include .codex-runners/config.json if it is modified, push the runner branch, and leave the worktree clean.",
+      "Run the relevant verification, commit every completed change on this runner branch, include .agents-runners/config.json if it is modified, push the runner branch, and leave the worktree clean.",
       "Do not merge or push the integration branch."
     ],
     reviewer: [
@@ -40,7 +40,7 @@ export function buildStagePrompt(
     ticket.qaInstructions,
     project.pools[runner.role].instructions,
     ...roleInstructions,
-    "Use Codex Runners MCP progress tools while working. Return a final JSON object with outcome, summary, and findings. Outcome must be exactly passed, failed, or blocked.",
+    "Use Agents Runners MCP progress tools while working. Return a final JSON object with outcome, summary, and findings. Outcome must be exactly passed, failed, or blocked.",
     "If outcome is blocked, also return decision with: question (the exact concrete question a human must answer), recommendedAction (the safest specific answer you will use automatically), and timeoutMinutes. Never ask a generic question such as what to do next. State the precise missing choice, value, or behavior. Do not recommend production secrets or destructive actions."
   ].filter(Boolean).join("\n\n");
 }

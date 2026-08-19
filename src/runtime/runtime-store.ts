@@ -33,7 +33,7 @@ export class RuntimeStore {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
       const pid = await this.#readLockPid();
       if (pid !== null && isProcessAlive(pid)) {
-        throw new RuntimeStoreError(`Codex Runners daemon is already running with PID ${pid}`);
+        throw new RuntimeStoreError(`Agents Runners daemon is already running with PID ${pid}`);
       }
       await rm(this.lockPath, { force: true });
       handle = await open(this.lockPath, "wx", 0o600);

@@ -41,7 +41,7 @@ function runner(id: string, role: RunnerRecord["role"], slot: number): RunnerRec
     slot,
     status: "idle",
     worktreePath: `/tmp/${id}`,
-    branch: `codex-runners/${id}`,
+    branch: `agents-runners/${id}`,
     tmuxTarget: `demo:${id}`
   };
 }

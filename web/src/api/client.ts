@@ -3,7 +3,7 @@ import { ticketSearchScore } from "../../../src/domain/ticket-search.js";
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 import type { AgentTerminalSnapshot } from "../../../src/orchestration/automation-manager.js";
 import type { DonnaConversationMessage, TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
-import type { CodexModelOption } from "../../../src/runners/codex-models.js";
+import type { AgentModelOption } from "../../../src/runners/agent-models.js";
 import type { DonnaEvent } from "../../../src/donna/donna-service.js";
 
 export class ApiError extends Error {
@@ -17,8 +17,8 @@ export class ApiError extends Error {
 }
 
 export class RunnersApi {
-  async listModels(): Promise<CodexModelOption[]> {
-    const response = await this.#request<{ models: CodexModelOption[] }>("/api/models");
+  async listModels(): Promise<AgentModelOption[]> {
+    const response = await this.#request<{ models: AgentModelOption[] }>("/api/models");
     return response.models;
   }
 

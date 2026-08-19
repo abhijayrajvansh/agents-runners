@@ -11,7 +11,7 @@ import { projectConfig } from "../helpers/project-config.js";
 const temporaryDirectories: string[] = [];
 
 async function temporaryStore() {
-  const directory = await mkdtemp(path.join(tmpdir(), "codex-runners-store-"));
+  const directory = await mkdtemp(path.join(tmpdir(), "agents-runners-store-"));
   temporaryDirectories.push(directory);
   const file = path.join(directory, "config.json");
   return { file, store: new AtomicJsonStore(file, ProjectConfigSchema) };

@@ -8,7 +8,7 @@ import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
-import { Command } from "commander";
+import { Command, InvalidArgumentError } from "commander";
 
 import { ProjectConfigSchema } from "../domain/schema.js";
 import { runDonnaClient } from "./donna-client.js";
@@ -18,6 +18,7 @@ import { runDoctor } from "../doctor/doctor.js";
 import { handleSessionStart } from "../hooks/session-start.js";
 import { initializeProject } from "../init/initialize-project.js";
 import { pluginRootFromModule, projectConfigPath } from "../platform/paths.js";
+import { isAgentKind, type AgentKind } from "../runners/agent-provider.js";
 import { userRuntimeRoot } from "../platform/paths.js";
 import { ensureDaemonForProject } from "../runtime/daemon-launcher.js";
 import { startDaemon } from "../server/daemon.js";
@@ -25,28 +26,35 @@ import type { RunnerRecord } from "../orchestration/runner-pool.js";
 
 const exec = promisify(execFile);
 
+function parseAgentKind(value: string): AgentKind {
+  if (!isAgentKind(value)) throw new InvalidArgumentError("Agent must be codex or claude.");
+  return value;
+}
+
 export function createCli(): Command {
   const program = new Command()
-    .name("codex-runners")
-    .description("Local skill-driven orchestration for Codex")
+    .name("agents-runners")
+    .description("Local skill-driven orchestration for Codex and Claude Code")
     .option("-g, --global", "operate on every active project")
     .version("0.1.0");
 
   program.command("init")
-    .description("Initialize Codex Runners in a Git project")
+    .description("Initialize Agents Runners in a Git project")
     .option("--root <path>", "project root", process.cwd())
     .option("--integration-branch <branch>", "branch receiving completed work", "dev")
+    .option("--agent <agent>", "agent CLI driving the runners (codex or claude)", parseAgentKind)
     .action(async options => {
       const result = await initializeProject(options.root, {
         pluginRoot: pluginRootFromModule(import.meta.url),
         nodePath: process.execPath,
-        integrationBranch: options.integrationBranch
+        integrationBranch: options.integrationBranch,
+        ...(options.agent ? { agent: options.agent } : {})
       });
       process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     });
 
-  const hook = program.command("hook").description("Codex lifecycle hook handlers");
-  hook.command("session-start").action(async () => {
+  const hook = program.command("hook").description("Editor lifecycle hook handlers");
+  hook.command("session-start").option("--agent <agent>", "calling agent", parseAgentKind).action(async () => {
     const input = JSON.parse(await readStdin()) as { cwd: string; source?: string; session_id?: string };
     const cliPath = fileURLToPath(import.meta.url);
     const output = await handleSessionStart(input, {
@@ -80,7 +88,7 @@ export function createCli(): Command {
   });
 
   program.command("daemon")
-    .description("Run the Codex Runners background daemon")
+    .description("Run the Agents Runners background daemon")
     .option("--port <port>", "loopback port", value => Number.parseInt(value, 10), 4777)
     .action(async options => {
       const daemon = await startDaemon({
@@ -106,7 +114,7 @@ export function createCli(): Command {
       const config = await loadOrInitializeProject(options.root);
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
       if (config.server.openBrowser) await exec("open", [result.url]);
-      process.stdout.write("Codex Runners started in the background.\n");
+      process.stdout.write("Agents Runners started in the background.\n");
       await printProjectLinks(config, result.url);
       await printResumedAssignments(config);
     });
@@ -120,13 +128,13 @@ export function createCli(): Command {
         return;
       }
       const status = await readDaemonStatus(userRuntimeRoot());
-      if (!status.running || !status.host || !status.port) throw new Error("Codex Runners daemon is not running");
+      if (!status.running || !status.host || !status.port) throw new Error("Agents Runners daemon is not running");
       const response = await fetch(`http://${status.host}:${status.port}/api/projects/${encodeURIComponent(project)}`, {
         method: "DELETE"
       });
       const body = await response.json() as { project?: { name?: string }; error?: { message?: string } };
       if (!response.ok) throw new Error(body.error?.message ?? `Could not stop project ${project}`);
-      process.stdout.write(`Stopped Codex Runners · ${body.project?.name ?? project}\n`);
+      process.stdout.write(`Stopped Agents Runners · ${body.project?.name ?? project}\n`);
       process.stdout.write("The shared daemon and other projects are still running.\n");
     });
 
@@ -135,12 +143,12 @@ export function createCli(): Command {
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
       const config = await loadOrInitializeProject(options.root);
-      process.stdout.write(`Restarting Codex Runners · ${config.project.name}…\n`);
+      process.stdout.write(`Restarting Agents Runners · ${config.project.name}…\n`);
       await stopDaemon(userRuntimeRoot());
       await waitForProjectSessionEnd(config.project.repositoryRoot);
       const result = await ensureDaemonForProject(config, daemonDependencies(fileURLToPath(import.meta.url)));
       if (config.server.openBrowser) await exec("open", [result.url]);
-      process.stdout.write("Codex Runners restarted in the background.\n");
+      process.stdout.write("Agents Runners restarted in the background.\n");
       await printProjectLinks(config, result.url);
       await printResumedAssignments(config);
     });
@@ -163,7 +171,7 @@ export function createCli(): Command {
     });
 
   program.command("open")
-    .description("Open this project in Codex Runners")
+    .description("Open this project in Agents Runners")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
       const config = await loadOrInitializeProject(options.root);
@@ -172,7 +180,7 @@ export function createCli(): Command {
     });
 
   program.command("doctor")
-    .description("Check local Codex Runners prerequisites")
+    .description("Check local Agents Runners prerequisites")
     .option("--root <path>", "initialized project root", process.cwd())
     .action(async options => {
       const report = await runDoctor({ root: options.root });
@@ -212,7 +220,7 @@ async function loadOrInitializeProject(root: string) {
       integrationBranch: "dev",
       bootstrapRepository: true
     });
-    process.stdout.write(`Initialized Codex Runners · ${result.config.project.name}\n`);
+    process.stdout.write(`Initialized Agents Runners · ${result.config.project.name} · ${result.agent}\n`);
     return result.config;
   }
 }

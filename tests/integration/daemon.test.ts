@@ -14,7 +14,7 @@ afterEach(async () => {
 
 describe("startDaemon", () => {
   it("binds loopback, writes runtime metadata, and releases its lock", async () => {
-    const runtimeRoot = await mkdtemp(path.join(tmpdir(), "codex-runners-daemon-"));
+    const runtimeRoot = await mkdtemp(path.join(tmpdir(), "agents-runners-daemon-"));
     cleanups.push(() => rm(runtimeRoot, { recursive: true, force: true }));
     const daemon = await startDaemon({ host: "127.0.0.1", port: 0, runtimeRoot, version: "0.1.0" });
 
@@ -32,7 +32,7 @@ describe("startDaemon", () => {
   });
 
   it("rejects non-loopback hosts", async () => {
-    const runtimeRoot = await mkdtemp(path.join(tmpdir(), "codex-runners-daemon-"));
+    const runtimeRoot = await mkdtemp(path.join(tmpdir(), "agents-runners-daemon-"));
     cleanups.push(() => rm(runtimeRoot, { recursive: true, force: true }));
 
     await expect(startDaemon({ host: "0.0.0.0", port: 4777, runtimeRoot, version: "0.1.0" }))

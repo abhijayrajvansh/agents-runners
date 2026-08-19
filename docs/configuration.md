@@ -1,6 +1,21 @@
 # Configuration
 
-Each initialized repository owns `.codex-runners/config.json`. The daemon is its sole writer while active and replaces it atomically. Manual edits are imported when valid; invalid edits leave the last valid in-memory board active and appear in the UI.
+Each initialized repository owns `.agents-runners/config.json`. The daemon is its sole writer while active and replaces it atomically. Manual edits are imported when valid; invalid edits leave the last valid in-memory board active and appear in the UI.
+
+## Agent
+
+`agent.kind` selects the coding-agent CLI that drives every runner, and `agent.command` overrides the binary path when the CLI is not on `PATH` under its usual name.
+
+| Field | Default | Meaning |
+|---|---|---|
+| `agent.kind` | `codex` | `codex` or `claude`; `agents-runners init --agent claude` sets it at initialization, and re-running `init --agent <kind>` switches an existing project |
+| `agent.command` | unset | Absolute path or alternate binary name for that CLI |
+
+Donna and each pool may override the project agent with their own `agent` field, so one board can run, for example, Claude Code developers alongside Codex reviewers. Overrides always invoke that CLI by its default name; `agent.command` applies only to the project's own agent.
+
+The two CLIs are driven identically: a headless turn per stage, streaming JSONL, resumed by a thread handle that persists across restarts. Codex turns run as `codex exec --json` and resume by thread ID; Claude Code turns run as `claude -p --output-format stream-json` and resume by session ID. Reasoning effort maps to `model_reasoning_effort` on Codex and `--effort` on Claude Code; the Codex-only `ultra` level collapses to `max` there.
+
+Switching agents keeps the board, tickets, worktrees, and branches intact, but not conversation history: threads belong to the CLI that created them. Runners start fresh threads on their next turn.
 
 ## Project and server
 
@@ -32,19 +47,20 @@ Donna uses a model independently from the delivery runner pools:
 
 | Field | Default | Meaning |
 |---|---|---|
-| `donna.model` | `gpt-5.6-luna` | Fast model used for project-manager chat turns |
+| `donna.agent` | project agent | Optional agent override for Donna alone |
+| `donna.model` | agent default | Fast model used for project-manager chat turns: `gpt-5.6-luna` on Codex, `sonnet` on Claude Code |
 | `donna.reasoningEffort` | `low` | Keeps routine coordination replies responsive |
 
-Change either value in `.codex-runners/config.json`. Existing Donna threads are resumed with the configured model, so conversation context remains intact when the model changes.
+Change either value in `.agents-runners/config.json`. Existing Donna threads are resumed with the configured model, so conversation context remains intact when the model changes.
 
-Donna's browser messages, persistent Codex thread ID, and recent conversation are stored under `.codex-runners/runtime/project-runtime.json`. `start` and `restart` reload that history and resume the same model thread in the Donna tmux window. If Codex reports that the saved thread is unavailable, Donna clears only that stale thread reference, starts a new thread, and seeds it with the persisted recent conversation.
+Donna's browser messages, persistent thread ID, and recent conversation are stored under `.agents-runners/runtime/project-runtime.json`. `start` and `restart` reload that history and resume the same model thread in the Donna tmux window. If the agent reports that the saved thread is unavailable, Donna clears only that stale thread reference, starts a new thread, and seeds it with the persisted recent conversation.
 
 ## Automation
 
 | Field | Default | Meaning |
 |---|---:|---|
 | `automation.enabled` | `true` | Reconcile actionable tickets automatically |
-| `automation.fullAccess` | `true` | Run worker Codex turns without sandbox or approval pauses |
+| `automation.fullAccess` | `true` | Run worker turns without sandbox or approval pauses (`--dangerously-bypass-approvals-and-sandbox` on Codex, `--dangerously-skip-permissions` on Claude Code) |
 | `automation.maxRetries` | `3` | Review/QA fix loops before Blocked |
 | `automation.humanInputTimeoutMinutes` | `10` | Minutes before a safe recommended blocker decision is applied automatically |
 | `automation.autoMerge` | `false` | Legacy compatibility field; final merges always require the Done-card button |
@@ -53,7 +69,7 @@ Donna's browser messages, persistent Codex thread ID, and recent conversation ar
 
 Set `automation.enabled` to `false` to keep the board readable without starting jobs. Changing `fullAccess` affects future turns only.
 
-Development, review, verification, and repair loops run automatically. A verification-passed issue is sealed to its own delivery branch and moved to Done. Only the **Merge to `<integrationBranch>`** button integrates it; after a successful verified merge, Codex Runners deletes that delivery branch locally and remotely. Dependent tickets wait until the prerequisite is merged, not merely verified.
+Development, review, verification, and repair loops run automatically. A verification-passed issue is sealed to its own delivery branch and moved to Done. Only the **Merge to `<integrationBranch>`** button integrates it; after a successful verified merge, Agents Runners deletes that delivery branch locally and remotely. Dependent tickets wait until the prerequisite is merged, not merely verified.
 
 Issue details are editable in planning/triage statuses (`backlog`, `needs_triage`, `needs_info`, `ready_for_human`, `wontfix`) plus Blocked and Done. `ready_for_agent`, Todo, In Progress, Review, and QA are read-only while agents own them. Their drawer exposes an emergency **Abort process** button that interrupts and unassigns active runners, clears the explicit assignment, and moves the issue to Blocked for human instructions.
 
@@ -64,17 +80,18 @@ When a runner genuinely needs a decision, it must record the exact question and 
 `pools.developer`, `pools.reviewer`, and `pools.qa` each accept:
 
 - `max` — concurrency cap, default `5`
-- `model` — optional Codex model override
+- `agent` — optional per-pool agent override (`codex` or `claude`)
+- `model` — optional model override; defaults to `gpt-5.6-sol` on Codex and `opus` on Claude Code
 - `reasoningEffort` — optional role-specific effort
 - `instructions` — persistent role guidance appended to stage prompts
 
 Runner IDs are stable (`developer-01`, `reviewer-01`, `qa-01`). Explicit ticket assignment takes priority over automatic claiming.
 
-When the local Codex configuration includes a `codex-router` provider, Codex Runners selects it explicitly and disables Responses WebSocket probing for runner and Donna processes. The router continues to stream over its supported HTTP Responses transport without noisy `426 Upgrade Required` fallback errors. Other Codex provider configurations are left unchanged.
+When the local Codex configuration includes a `codex-router` provider, Agents Runners selects it explicitly and disables Responses WebSocket probing for runner and Donna processes. The router continues to stream over its supported HTTP Responses transport without noisy `426 Upgrade Required` fallback errors. Other Codex provider configurations are left unchanged.
 
 ## Worktrees and environments
 
-Persistent runner worktrees default to `.worktrees/codex-runners/<runner-id>` with branches under `codex-runners/`. They are never automatically deleted.
+Persistent runner worktrees default to `.worktrees/agents-runners/<runner-id>` with branches under `agents-runners/`. They are never automatically deleted.
 
 `environments.files` lists development environment filenames copied into runner worktrees. Defaults are `.env`, `.env.local`, and `.env.development`. Values are never placed in config. Production-like filenames are ignored unless `environments.allowProduction` is explicitly set to `true`.
 

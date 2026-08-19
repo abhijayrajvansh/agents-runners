@@ -5,5 +5,5 @@ import { App } from "./app.js";
 import "./styles.css";
 
 const root = document.getElementById("root");
-if (!root) throw new Error("Codex Runners root element is missing");
+if (!root) throw new Error("Agents Runners root element is missing");
 createRoot(root).render(<StrictMode><App /></StrictMode>);

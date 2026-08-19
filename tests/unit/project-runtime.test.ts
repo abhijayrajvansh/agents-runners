@@ -14,7 +14,7 @@ afterEach(async () => {
 
 describe("JsonProjectRuntime", () => {
   it("persists ticket assignments without exposing them in project config", async () => {
-    const root = await mkdtemp(path.join(tmpdir(), "codex-runners-runtime-"));
+    const root = await mkdtemp(path.join(tmpdir(), "agents-runners-runtime-"));
     roots.push(root);
     const first = new JsonProjectRuntime(root);
     first.setTicket("demo", "auth", {

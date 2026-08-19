@@ -49,7 +49,7 @@ export async function runProjectSession(
     throw error;
   }
   if (!session.acquired) {
-    process.stdout.write(`Codex Runners · ${config.project.name}\n${url}\n`);
+    process.stdout.write(`Agents Runners · ${config.project.name}\n${url}\n`);
     process.stdout.write(`Reopened the existing project session (PID ${session.existingPid}).\n`);
     return;
   }
@@ -75,10 +75,10 @@ export async function runProjectSession(
   const shutdown = () => {
     if (stopping) return;
     stopping = true;
-    process.stdout.write("\nStopping Codex Runners…\n");
+    process.stdout.write("\nStopping Agents Runners…\n");
     void stopDaemon(runtimeRoot)
       .then(status => {
-        process.stdout.write(status.running ? "Daemon is still running.\n" : "Codex Runners stopped.\n");
+        process.stdout.write(status.running ? "Daemon is still running.\n" : "Agents Runners stopped.\n");
         socket.close();
         finish();
       })
@@ -88,7 +88,7 @@ export async function runProjectSession(
   process.on("SIGINT", shutdown);
   process.on("SIGTERM", shutdown);
   socket.once("open", () => {
-    process.stdout.write(`Codex Runners · ${config.project.name}\n${url}\n`);
+    process.stdout.write(`Agents Runners · ${config.project.name}\n${url}\n`);
     process.stdout.write("Live activity follows. Press Ctrl+C to stop.\n");
   });
   socket.on("message", raw => {
@@ -107,7 +107,7 @@ export async function runProjectSession(
     if (!stopping) fail(error);
   });
   socket.once("close", () => {
-    if (!stopping) process.stdout.write("Codex Runners session ended.\n");
+    if (!stopping) process.stdout.write("Agents Runners session ended.\n");
     finish();
   });
 
@@ -134,14 +134,14 @@ export async function printProjectSessions(
   const daemon = await readDaemonStatus(runtimeRoot);
   const roots = await new RuntimeStore(runtimeRoot).loadProjects();
   const selectedRoots = selectProjectRoots(roots, options.currentRoot ?? process.cwd(), options.global ?? false);
-  process.stdout.write(`${color.bold("Codex Runners")}\n\n`);
+  process.stdout.write(`${color.bold("Agents Runners")}\n\n`);
   process.stdout.write(`${daemon.running ? color.green("● Running") : color.red("● Stopped")}\n`);
   if (roots.length === 0) {
     process.stdout.write(`\n${color.dim("No registered projects.")}\n`);
     return;
   }
   if (selectedRoots.length === 0) {
-    throw new ProjectSessionError("This directory is not a running Codex Runners project. Use `cr -g ls` to list every active project.");
+    throw new ProjectSessionError("This directory is not a running Agents Runners project. Use `cr -g ls` to list every active project.");
   }
 
   if (options.verbose) {
@@ -259,7 +259,7 @@ async function readTmuxSession(projectId: string): Promise<{
   name: string;
   panes: Array<{ window: string; command: string; pid: string; path: string }>;
 } | null> {
-  const name = `codex-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  const name = `agents-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
   try {
     const result = await execFileAsync("tmux", [
       "list-panes",

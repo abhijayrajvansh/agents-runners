@@ -1,12 +1,12 @@
-# Codex Runners Design
+# Agents Runners Design
 
 Date: 2026-08-18
 
 ## Summary
 
-Codex Runners is a macOS-first personal Codex plugin that turns project work into a local, bidirectional Kanban system operated by a persistent AI project manager named Donna. The user can talk to Donna from a browser or terminal, create and edit tickets, drag work into actionable columns, and watch persistent Codex runners implement, review, test, merge, and push work without manual orchestration.
+Agents Runners is a macOS-first personal Codex plugin that turns project work into a local, bidirectional Kanban system operated by a persistent AI project manager named Donna. The user can talk to Donna from a browser or terminal, create and edit tickets, drag work into actionable columns, and watch persistent Codex runners implement, review, test, merge, and push work without manual orchestration.
 
-The system is local-first. Each initialized project owns a readable `.codex-runners/config.json`; one loopback daemon coordinates all initialized projects, runner pools, `tmux` sessions, worktrees, Codex thread IDs, board events, and browser clients.
+The system is local-first. Each initialized project owns a readable `.agents-runners/config.json`; one loopback daemon coordinates all initialized projects, runner pools, `tmux` sessions, worktrees, Codex thread IDs, board events, and browser clients.
 
 ## Goals
 
@@ -32,26 +32,26 @@ The system is local-first. Each initialized project owns a readable `.codex-runn
 
 ## Installation and project lifecycle
 
-The plugin is stored at `~/plugins/codex-runners`, listed in the personal marketplace, and installed into Codex as `codex-runners@personal`.
+The plugin is stored at `~/plugins/agents-runners`, listed in the personal marketplace, and installed into Codex as `agents-runners@personal`.
 
-The `codex-runners init` command runs inside a selected Git repository. It detects the repository root, current worktree, branches, scripts, existing worktree convention, and safe local environment filenames. It then creates:
+The `agents-runners init` command runs inside a selected Git repository. It detects the repository root, current worktree, branches, scripts, existing worktree convention, and safe local environment filenames. It then creates:
 
-- `.codex-runners/config.json`
-- `.codex-runners/runtime/` and its persistence files
-- a managed Codex Runners block in the nearest root `AGENTS.md`
+- `.agents-runners/config.json`
+- `.agents-runners/runtime/` and its persistence files
+- a managed Agents Runners block in the nearest root `AGENTS.md`
 - a project-local `.codex/hooks.json` SessionStart entry while preserving unrelated hooks
 - persistent worktree directories lazily as runner slots are provisioned
 - appropriate `.gitignore` entries for local runtime data and copied credentials
 
-The project SessionStart hook is a no-op unless `.codex-runners/config.json` exists. For initialized projects it starts or reuses the global loopback daemon, registers the project, injects concise Donna/MCP context into the Codex session, and opens the project URL once. Resume events reuse the existing tab and daemon.
+The project SessionStart hook is a no-op unless `.agents-runners/config.json` exists. For initialized projects it starts or reuses the global loopback daemon, registers the project, injects concise Donna/MCP context into the Codex session, and opens the project URL once. Resume events reuse the existing tab and daemon.
 
-`codex-runners start`, `stop`, `status`, `open`, `donna`, and `doctor` provide explicit lifecycle control. Stopping the daemon does not remove worktrees, branches, config, tickets, logs, or Codex thread IDs.
+`agents-runners start`, `stop`, `status`, `open`, `donna`, and `doctor` provide explicit lifecycle control. Stopping the daemon does not remove worktrees, branches, config, tickets, logs, or Codex thread IDs.
 
 ## System architecture
 
 ### Personal plugin
 
-The plugin manifest advertises the Codex Runners skill and MCP server. Its bundled CLI contains the daemon, project initializer, SessionStart handler, terminal Donna client, and diagnostic commands.
+The plugin manifest advertises the Agents Runners skill and MCP server. Its bundled CLI contains the daemon, project initializer, SessionStart handler, terminal Donna client, and diagnostic commands.
 
 ### Global daemon
 
@@ -68,13 +68,13 @@ The daemon uses a lock and PID file under the user's application-support directo
 
 ### Project configuration and runtime state
 
-`.codex-runners/config.json` is the readable project source of truth. It contains project settings and the complete ticket list. The daemon is the sole writer while active and uses atomic temporary-file replacement. A file watcher imports valid manual edits. Invalid edits do not replace the last valid in-memory board and create a visible configuration error.
+`.agents-runners/config.json` is the readable project source of truth. It contains project settings and the complete ticket list. The daemon is the sole writer while active and uses atomic temporary-file replacement. A file watcher imports valid manual edits. Invalid edits do not replace the last valid in-memory board and create a visible configuration error.
 
-High-volume and process-specific data lives under `.codex-runners/runtime/` and remains gitignored. This includes event JSONL, process metadata, Codex thread IDs, runner leases, last output, health timestamps, and retry history.
+High-volume and process-specific data lives under `.agents-runners/runtime/` and remains gitignored. This includes event JSONL, process metadata, Codex thread IDs, runner leases, last output, health timestamps, and retry history.
 
 ### Donna
 
-Each project has one persistent Donna identity and Codex thread ID. Browser messages and the interactive `codex-runners donna` terminal client are serialized into that same thread. Every turn wakes Donna through `codex exec resume <thread-id> --json`, streams structured events, stores the final response, and returns Donna to Idle.
+Each project has one persistent Donna identity and Codex thread ID. Browser messages and the interactive `agents-runners donna` terminal client are serialized into that same thread. Every turn wakes Donna through `codex exec resume <thread-id> --json`, streams structured events, stores the final response, and returns Donna to Idle.
 
 Ordinary Codex sessions can call MCP tools to read the board, send Donna a message, create tickets, and inspect runners. They do not replace Donna's canonical thread.
 
@@ -132,7 +132,7 @@ Moving an existing ticket directly into In Progress, Review, or QA resumes or be
 
 The default integration branch is `dev`, configurable per project. Initialization stops with a clear error if that branch cannot be resolved and the user has not configured another branch.
 
-Each role slot receives a persistent worktree and branch under the repository's existing convention or `.worktrees/codex-runners/<role-id>`. Worktrees and branches are never removed automatically.
+Each role slot receives a persistent worktree and branch under the repository's existing convention or `.worktrees/agents-runners/<role-id>`. Worktrees and branches are never removed automatically.
 
 Before a new job, a clean Idle runner branch fast-forwards to the latest integration branch. A dirty or diverged runner becomes Unhealthy and is not assigned new work until Donna repairs or reports it. Reviewer and QA branches fast-forward to the exact candidate commit they inspect.
 
@@ -212,8 +212,8 @@ The release gate runs TypeScript type checking, unit and integration tests, fron
 
 ## Distribution and updates
 
-The plugin manifest includes the skill, local MCP server, interface metadata, and built assets. The personal marketplace entry uses the standard `AVAILABLE` and `ON_INSTALL` policy. Local development updates use the plugin-creator cachebuster script followed by reinstalling `codex-runners@personal` and testing in a new Codex thread.
+The plugin manifest includes the skill, local MCP server, interface metadata, and built assets. The personal marketplace entry uses the standard `AVAILABLE` and `ON_INSTALL` policy. Local development updates use the plugin-creator cachebuster script followed by reinstalling `agents-runners@personal` and testing in a new Codex thread.
 
 ## Success criteria
 
-The first release is complete when an initialized temporary Git project can start Codex, automatically open Codex Runners, accept a ticket through browser or MCP, move it from Todo through development, review, QA, integration, push, and Done, preserve all runner worktrees and threads in Idle state, and show the same Donna conversation in browser and terminal.
+The first release is complete when an initialized temporary Git project can start Codex, automatically open Agents Runners, accept a ticket through browser or MCP, move it from Todo through development, review, QA, integration, push, and Done, preserve all runner worktrees and threads in Idle state, and show the same Donna conversation in browser and terminal.

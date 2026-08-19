@@ -11,6 +11,7 @@ export function projectConfig(overrides: Partial<ProjectConfig> = {}): ProjectCo
       integrationBranch: "dev",
       remote: "origin"
     },
+    agent: { kind: "codex" },
     server: {
       host: "127.0.0.1",
       port: 4777,
@@ -36,9 +37,9 @@ export function projectConfig(overrides: Partial<ProjectConfig> = {}): ProjectCo
       qa: { max: 5, instructions: "" }
     },
     worktrees: {
-      root: ".worktrees/codex-runners",
+      root: ".worktrees/agents-runners",
       persistent: true,
-      branchPrefix: "codex-runners"
+      branchPrefix: "agents-runners"
     },
     environments: {
       files: [".env", ".env.local", ".env.development"],

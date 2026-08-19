@@ -1,0 +1,21 @@
+{
+  "name": "agents-runners",
+  "version": "0.1.0",
+  "description": "Run a local realtime skill-flow board with Donna and persistent autonomous runners on Codex or Claude Code, using Matt Pocock's composable engineering skills.",
+  "author": {
+    "name": "Abhijay Rajvansh"
+  },
+  "homepage": "https://github.com/abhijayrajvansh/agents-runners",
+  "repository": "https://github.com/abhijayrajvansh/agents-runners",
+  "license": "MIT",
+  "keywords": [
+    "agents",
+    "skill-flow",
+    "automation",
+    "workflow",
+    "tmux",
+    "worktrees"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.claude-plugin/mcp.json"
+}

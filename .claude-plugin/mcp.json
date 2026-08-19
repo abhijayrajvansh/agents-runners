@@ -2,8 +2,7 @@
   "mcpServers": {
     "agents-runners": {
       "command": "node",
-      "args": ["./dist/bin/mcp.mjs"],
-      "cwd": "."
+      "args": ["${CLAUDE_PLUGIN_ROOT}/dist/bin/mcp.mjs"]
     }
   }
 }

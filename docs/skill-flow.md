@@ -1,6 +1,6 @@
 # Skill-Driven Runner
 
-Codex Runners moved off a fixed Agile/Kanban pipeline and onto Matt Pocock's small, composable engineering skills. The skill files live in `skills/` (vendored from `github.com/mattpocock/skills` under the MIT license), and the run-once configuration lives in `docs/agents/` with an `## Agent skills` pointer block in `AGENTS.md`.
+Agents Runners moved off a fixed Agile/Kanban pipeline and onto Matt Pocock's small, composable engineering skills. The skill files live in `skills/` (vendored from `github.com/mattpocock/skills` under the MIT license), and the run-once configuration lives in `docs/agents/` with an `## Agent skills` pointer block in `AGENTS.md`.
 
 ## The flow
 
@@ -24,7 +24,7 @@ The bundled skills form one connected chain:
 
 ## How the runner consumes it
 
-The Codex Runners daemon is the delivery engine underneath this flow. Planning and triage statuses are inert and editable (`backlog`, `needs_triage`, `needs_info`, `ready_for_human`, `wontfix`). When an issue reaches `ready_for_agent`, the scheduler claims it with a persistent developer runner and runs it through implement → review → verification → Done, then merges through one serialized integration lane.
+The Agents Runners daemon is the delivery engine underneath this flow. Planning and triage statuses are inert and editable (`backlog`, `needs_triage`, `needs_info`, `ready_for_human`, `wontfix`). When an issue reaches `ready_for_agent`, the scheduler claims it with a persistent developer runner and runs it through implement → review → verification → Done, then merges through one serialized integration lane.
 
 The schema records how each issue entered the board:
 

@@ -175,7 +175,7 @@ export class JsonProjectRuntime implements ProjectRuntimeRepository {
     if (!existsSync(this.filePath)) return { version: 1, tickets: {}, donnaThreads: {}, donnaMessages: {}, blockerNotifications: {}, runnerThreads: {} };
     const parsed = JSON.parse(readFileSync(this.filePath, "utf8")) as Partial<RuntimeDocument>;
     if (parsed.version !== 1 || !parsed.tickets || typeof parsed.tickets !== "object") {
-      throw new Error(`Invalid Codex Runners runtime document at ${this.filePath}`);
+      throw new Error(`Invalid Agents Runners runtime document at ${this.filePath}`);
     }
     return {
       version: 1,

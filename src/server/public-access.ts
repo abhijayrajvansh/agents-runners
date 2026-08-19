@@ -1,6 +1,6 @@
 import type { IncomingMessage } from "node:http";
 
-export const PUBLIC_ACCESS_COOKIE = "codex_runners_access";
+export const PUBLIC_ACCESS_COOKIE = "agents_runners_access";
 
 export function isPublicRequest(request: IncomingMessage): boolean {
   const forwardedHost = headerValue(request.headers["x-forwarded-host"]);

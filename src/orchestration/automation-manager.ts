@@ -2,14 +2,16 @@ import type { ProjectConfig, RoleName, Ticket } from "../domain/types.js";
 import { IntegrationService } from "../git/integration-service.js";
 import { projectRuntimePath } from "../platform/paths.js";
 import { CommandRunner } from "../process/command-runner.js";
-import { CodexService, detectCodexRouterOverrides } from "../runners/codex-service.js";
+import { resolveRoleAgent } from "../domain/agent-selection.js";
+import { AgentService } from "../runners/agent-service.js";
+import { detectCodexRouterOverrides } from "../runners/codex-provider.js";
 import { TmuxService } from "../runners/tmux-service.js";
 import { WorktreeService } from "../runners/worktree-service.js";
 import { JsonProjectRuntime, type ProjectRuntimeRepository, type TicketDeliveryState } from "../runtime/project-runtime.js";
 import { Redactor } from "../security/redactor.js";
 import type { EventBus, ProjectEvent } from "../server/event-bus.js";
 import type { ProjectRegistry } from "../server/project-registry.js";
-import { CodexStageExecutor } from "./codex-stage-executor.js";
+import { AgentStageExecutor } from "./stage-executor.js";
 import { RunnerPool, type RunnerRecord } from "./runner-pool.js";
 import { Scheduler, type StageExecution, type StageExecutionResult, type StageExecutor } from "./scheduler.js";
 import { readableBlockerReason } from "./blockers.js";
@@ -39,23 +41,28 @@ export class AutomationManager {
   readonly commands: CommandRunner;
   readonly worktrees: WorktreeService;
   readonly tmux: TmuxService;
-  readonly codex: CodexService;
+  readonly agents: AgentService;
   readonly integration: IntegrationService;
   #projects = new Map<string, ProjectAutomation>();
   #merges = new Map<string, Promise<TicketDeliveryState>>();
 
-  constructor(registry: ProjectRegistry, events: EventBus, options: { codexCommand?: string } = {}) {
+  constructor(
+    registry: ProjectRegistry,
+    events: EventBus,
+    options: { codexCommand?: string; claudeCommand?: string } = {}
+  ) {
     this.registry = registry;
     this.events = events;
     this.commands = new CommandRunner();
     this.worktrees = new WorktreeService(this.commands);
     this.tmux = new TmuxService(this.commands);
-    this.codex = new CodexService(
-      this.tmux,
-      new Redactor([]),
-      options.codexCommand ?? "codex",
-      detectCodexRouterOverrides()
-    );
+    this.agents = new AgentService(this.tmux, new Redactor([]), {
+      commands: {
+        codex: options.codexCommand ?? "codex",
+        claude: options.claudeCommand ?? "claude"
+      },
+      configOverrides: { codex: detectCodexRouterOverrides() }
+    });
     this.integration = new IntegrationService(this.commands, this.worktrees);
   }
 
@@ -72,15 +79,10 @@ export class AutomationManager {
           window: worktree.id,
           cwd: worktree.worktreePath
         });
-        await this.tmux.ensureInteractiveCodex(consolePane, {
-          command: this.codex.codexCommand,
-          worktreePath: worktree.worktreePath,
-          model: config.pools[createdRole].model ?? "gpt-5.6-sol",
-          reasoningEffort: config.pools[createdRole].reasoningEffort ?? "medium",
-          fullAccess: config.automation.fullAccess,
-          configOverrides: this.codex.configOverrides,
-          env: { CODEX_RUNNERS_PROJECT_ROOT: config.project.repositoryRoot }
-        });
+        await this.tmux.ensureInteractiveAgent(
+          consolePane,
+          this.#interactiveSpec(config, createdRole, worktree.worktreePath)
+        );
         const automationPane = await this.tmux.ensurePane({
           session: sessionName(projectId),
           window: `${worktree.id}-automation`,
@@ -97,8 +99,8 @@ export class AutomationManager {
         return runner;
       }));
     }
-    const codexExecutor = new CodexStageExecutor(
-      this.codex,
+    const stageExecutor = new AgentStageExecutor(
+      this.agents,
       this.integration,
       (input, event) => this.events.publish({
         type: "runner.event",
@@ -108,7 +110,7 @@ export class AutomationManager {
       }),
       runtime
     );
-    const executor = new PreparedStageExecutor(this.worktrees, codexExecutor);
+    const executor = new PreparedStageExecutor(this.worktrees, stageExecutor);
     const scheduler = new Scheduler({ registry: this.registry, events: this.events, runtime, pools, executor });
     const unsubscribe = this.events.subscribe(projectId, event => this.#handleEvent(projectId, event));
     const heartbeat = setInterval(() => this.reconcile(projectId), 2_000);
@@ -255,7 +257,8 @@ export class AutomationManager {
   }
 
   async terminals(projectId: string): Promise<AgentTerminalSnapshot[]> {
-    this.registry.get(projectId);
+    const config = this.registry.get(projectId);
+    const agentCommand = this.agents.providerFor({ kind: config.agent.kind }).command;
     const session = sessionName(projectId);
     const windows = await this.tmux.listWindows(session).catch(() => []);
     const runners = new Map(this.list(projectId).map(runner => [runner.id, runner]));
@@ -271,7 +274,7 @@ export class AutomationManager {
         role: id === "donna" ? "donna" as const : runner?.role ?? roleFromRunnerId(id),
         status: pane.pid === 0 ? "unhealthy" : runner?.status === "working" ? "working" : runner?.status === "unhealthy" ? "unhealthy" : "idle",
         ...(runner?.ticketId ? { ticketId: runner.ticketId } : {}),
-        command: id === "donna" ? pane.command : "codex",
+        command: id === "donna" ? pane.command : agentCommand,
         pid: pane.pid,
         output: stripTerminalControl(output).trimEnd(),
         attachCommand: `tmux attach -t ${target}`
@@ -287,16 +290,26 @@ export class AutomationManager {
       const target = `${session}:${id}`;
       const state = await this.tmux.inspectPane(target).catch(() => undefined);
       if (!state?.cwd) return;
-      await this.tmux.ensureInteractiveCodex({ session, window: id, target, cwd: state.cwd }, {
-        command: this.codex.codexCommand,
-        worktreePath: state.cwd,
-        model: config.pools[role].model ?? "gpt-5.6-sol",
-        reasoningEffort: config.pools[role].reasoningEffort ?? "medium",
-        fullAccess: config.automation.fullAccess,
-        configOverrides: this.codex.configOverrides,
-        env: { CODEX_RUNNERS_PROJECT_ROOT: config.project.repositoryRoot }
-      });
+      await this.tmux.ensureInteractiveAgent(
+        { session, window: id, target, cwd: state.cwd },
+        this.#interactiveSpec(config, role, state.cwd)
+      );
     }));
+  }
+
+  #interactiveSpec(config: ProjectConfig, role: RoleName, worktreePath: string) {
+    const agent = resolveRoleAgent(config, role, selection => this.agents.providerFor(selection));
+    const provider = this.agents.providerFor(agent.selection);
+    return {
+      command: provider.command,
+      args: provider.buildInteractiveArgs({
+        worktreePath,
+        model: agent.model,
+        reasoningEffort: agent.reasoningEffort,
+        fullAccess: config.automation.fullAccess
+      }),
+      env: { AGENTS_RUNNERS_PROJECT_ROOT: config.project.repositoryRoot }
+    };
   }
 
   runtimeFor(config: ProjectConfig): ProjectRuntimeRepository {
@@ -371,9 +384,9 @@ export class AutomationManager {
 
 class PreparedStageExecutor implements StageExecutor {
   readonly worktrees: WorktreeService;
-  readonly delegate: CodexStageExecutor;
+  readonly delegate: AgentStageExecutor;
 
-  constructor(worktrees: WorktreeService, delegate: CodexStageExecutor) {
+  constructor(worktrees: WorktreeService, delegate: AgentStageExecutor) {
     this.worktrees = worktrees;
     this.delegate = delegate;
   }
@@ -414,7 +427,7 @@ function assignedRunnerId(input: StageExecution): string | undefined {
 }
 
 function sessionName(projectId: string): string {
-  return `codex-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  return `agents-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 function roleFromRunnerId(id: string): RoleName {

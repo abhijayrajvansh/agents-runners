@@ -4,7 +4,7 @@ import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../../../src
 import type { RunnerRecord } from "../../../src/orchestration/runner-pool.js";
 import type { DonnaConversationMessage, TicketDeliveryState } from "../../../src/runtime/project-runtime.js";
 import type { ProjectEvent } from "../../../src/server/event-bus.js";
-import type { CodexModelOption } from "../../../src/runners/codex-models.js";
+import type { AgentModelOption } from "../../../src/runners/agent-models.js";
 import { RunnersApi } from "../api/client.js";
 import { connectProjectSocket } from "../api/socket.js";
 
@@ -15,7 +15,7 @@ export type ProjectState = {
   runners: RunnerRecord[];
   activity: ProjectEvent[];
   donnaMessages: DonnaConversationMessage[];
-  models: CodexModelOption[];
+  models: AgentModelOption[];
   deliveries: Record<string, TicketDeliveryState>;
   connected: boolean;
   loading: boolean;
@@ -35,7 +35,7 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
   const [runners, setRunners] = useState<RunnerRecord[]>([]);
   const [activity, setActivity] = useState<ProjectEvent[]>([]);
   const [donnaMessages, setDonnaMessages] = useState<DonnaConversationMessage[]>([]);
-  const [models, setModels] = useState<CodexModelOption[]>([]);
+  const [models, setModels] = useState<AgentModelOption[]>([]);
   const [deliveries, setDeliveries] = useState<Record<string, TicketDeliveryState>>({});
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -54,7 +54,9 @@ export function useProject(projectId: string, api = defaultApi): ProjectState {
       setProject(nextProject);
       setRunners(nextRunners);
       setDonnaMessages(nextDonnaMessages);
-      setModels(nextModels);
+      // Only the project's own agent has usable models; a Codex board must not
+      // offer Claude Code slugs its CLI would reject.
+      setModels(nextModels.filter(option => option.agent === nextProject.agent.kind));
       setDeliveries(nextDeliveries);
       setError(null);
     } catch (caught) {

@@ -1,4 +1,4 @@
-# Codex Runners Implementation Plan
+# Agents Runners Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -8,14 +8,14 @@
 
 **Tech Stack:** Node.js 24, TypeScript 5, Express 5, ws, Zod, Commander, MCP TypeScript SDK, React 19, Vite, dnd-kit, GSAP, Vitest, Testing Library, Supertest, Playwright, tsup.
 
-**Spec:** `docs/superpowers/specs/2026-08-18-codex-runners-design.md`
+**Spec:** `docs/superpowers/specs/2026-08-18-agents-runners-design.md`
 
 ## Global Constraints
 
 - Target macOS only in version 1; require Node.js 22 or newer, Git, tmux, and an authenticated Codex CLI.
 - Bind the daemon only to `127.0.0.1`; never expose a non-loopback listener.
-- Use `.codex-runners/config.json` as the atomic, human-readable board source of truth.
-- Keep `.codex-runners/runtime/`, copied environment files, raw events, PID data, and thread IDs out of Git.
+- Use `.agents-runners/config.json` as the atomic, human-readable board source of truth.
+- Keep `.agents-runners/runtime/`, copied environment files, raw events, PID data, and thread IDs out of Git.
 - Use persistent runner worktrees and branches; never delete them automatically.
 - Default integration branch to `dev`; only the serialized integration lane may push it.
 - Default role limits to five Developers, five Reviewers, and five QA runners.
@@ -50,11 +50,11 @@
 
 ```json
 {
-  "name": "codex-runners",
+  "name": "agents-runners",
   "version": "0.1.0",
   "type": "module",
   "engines": { "node": ">=22" },
-  "bin": { "codex-runners": "dist/bin/cli.mjs" },
+  "bin": { "agents-runners": "dist/bin/cli.mjs" },
   "scripts": {
     "build": "npm run build:node && npm run build:web",
     "build:node": "tsup",
@@ -175,8 +175,8 @@ await git(temp, "init", "-b", "dev");
 await fs.writeFile(path.join(temp, "AGENTS.md"), "# Existing rules\n");
 const result = await initializeProject(temp, { pluginRoot, openBrowser: false });
 expect(result.config.project.integrationBranch).toBe("dev");
-expect(await read(".codex-runners/config.json")).toContain('"fullAccess": true');
-expect(await read("AGENTS.md")).toContain("<!-- codex-runners:start -->");
+expect(await read(".agents-runners/config.json")).toContain('"fullAccess": true');
+expect(await read("AGENTS.md")).toContain("<!-- agents-runners:start -->");
 expect(JSON.parse(await read(".codex/hooks.json")).hooks.SessionStart).toHaveLength(1);
 ```
 
@@ -205,11 +205,11 @@ export function createProjectConfig(input: InitInput): ProjectConfig {
 ```ts
 const hook = {
   matcher: "startup|resume",
-  hooks: [{ type: "command", command: `${quote(process.execPath)} ${quote(cliPath)} hook session-start`, timeout: 10, statusMessage: "Starting Codex Runners" }]
+  hooks: [{ type: "command", command: `${quote(process.execPath)} ${quote(cliPath)} hook session-start`, timeout: 10, statusMessage: "Starting Agents Runners" }]
 };
 mergeHookByCommand(existing, "SessionStart", hook);
-replaceManagedBlock(agentsPath, "codex-runners", agentsInstructions);
-appendUniqueLines(gitignorePath, [".codex-runners/runtime/", ".codex-runners/**/*.env"]);
+replaceManagedBlock(agentsPath, "agents-runners", agentsInstructions);
+appendUniqueLines(gitignorePath, [".agents-runners/runtime/", ".agents-runners/**/*.env"]);
 ```
 
 - [ ] **Step 5: Implement the Commander CLI and SessionStart JSON input/output**
@@ -307,7 +307,7 @@ wss.on("connection", (socket, request) => {
 - [ ] **Step 7: Add PID locking, loopback enforcement, and graceful shutdown**
 
 ```ts
-if (host !== "127.0.0.1") throw new Error("Codex Runners v1 only permits 127.0.0.1");
+if (host !== "127.0.0.1") throw new Error("Agents Runners v1 only permits 127.0.0.1");
 const lock = await acquireDaemonLock(runtimeRoot);
 process.once("SIGTERM", () => handle.close());
 ```
@@ -368,7 +368,7 @@ export function parseCodexEvent(line: string): CodexEvent {
 
 ```ts
 const runner = await worktrees.ensureRunner({ role: "developer", slot: 1, integrationBranch: "dev" });
-expect(runner.branch).toBe("codex-runners/developer-01");
+expect(runner.branch).toBe("agents-runners/developer-01");
 await integration.integrate({ candidateBranch: runner.branch, integrationBranch: "dev", verify: ["node -e \"process.exit(0)\""] });
 expect(await git(repo, "rev-parse", "dev")).toBe(await git(repo, "rev-parse", "HEAD"));
 ```
@@ -564,7 +564,7 @@ Expected: FAIL because MCP tools are missing.
 ```json
 {
   "mcpServers": {
-    "codex-runners": {
+    "agents-runners": {
       "command": "node",
       "args": ["./dist/bin/mcp.mjs"],
       "cwd": "."
@@ -668,7 +668,7 @@ async function moveTicket(ticketId: string, status: TicketStatus) {
 </main>
 ```
 
-Use the selected gpt-taste component set without weakening dashboard usability: compact runner portraits appear inline beside the Codex Runners heading, the runner inspector is a keyboard-accessible horizontal accordion, and the top command bar contains a restrained infinite activity marquee that pauses on hover and focus. The 12-column desktop composition uses an 8-column board plus 4-column Donna rail, so every row fills all 12 tracks with `grid-auto-flow: dense` and no dead cells.
+Use the selected gpt-taste component set without weakening dashboard usability: compact runner portraits appear inline beside the Agents Runners heading, the runner inspector is a keyboard-accessible horizontal accordion, and the top command bar contains a restrained infinite activity marquee that pauses on hover and focus. The 12-column desktop composition uses an 8-column board plus 4-column Donna rail, so every row fills all 12 tracks with `grid-auto-flow: dense` and no dead cells.
 
 - [ ] **Step 6: Implement the pure-white Outfit design system and restrained GSAP motion**
 
@@ -756,7 +756,7 @@ Expected: FAIL until the test harness and static SPA fallback are wired.
 ```ts
 app.use(express.static(publicDir));
 app.get("/{*splat}", (_req, res) => res.sendFile(path.join(publicDir, "index.html")));
-if (process.env.CODEX_RUNNERS_FAKE_RUNNER === "1") dependencies.codex = createFakeCodexController();
+if (process.env.AGENTS_RUNNERS_FAKE_RUNNER === "1") dependencies.codex = createFakeCodexController();
 ```
 
 - [ ] **Step 7: Run doctor, API, and browser tests, then commit**
@@ -773,7 +773,7 @@ git commit -m "feat: add diagnostics and browser workflow"
 ### Task 9: Plugin skill, manifests, documentation, and distributable build
 
 **Files:**
-- Create: `skills/codex-runners/SKILL.md`
+- Create: `skills/agents-runners/SKILL.md`
 - Create: `README.md`
 - Create: `docs/configuration.md`
 - Create: `docs/architecture.md`
@@ -799,7 +799,7 @@ Expected: both instruction files are read completely before editing `SKILL.md`.
 expect(await exists("dist/bin/cli.mjs")).toBe(true);
 expect(await exists("dist/bin/mcp.mjs")).toBe(true);
 expect(await exists("dist/public/index.html")).toBe(true);
-expect(JSON.parse(await read(".codex-plugin/plugin.json"))).toMatchObject({ name: "codex-runners", mcpServers: "./.mcp.json" });
+expect(JSON.parse(await read(".codex-plugin/plugin.json"))).toMatchObject({ name: "agents-runners", mcpServers: "./.mcp.json" });
 ```
 
 - [ ] **Step 3: Run the distribution test and verify it fails**
@@ -808,37 +808,37 @@ Run: `npm test -- tests/integration/distribution.test.ts`
 
 Expected: FAIL until the bundled files and finalized manifest exist.
 
-- [ ] **Step 4: Write the Codex Runners skill with explicit Donna and lifecycle instructions**
+- [ ] **Step 4: Write the Agents Runners skill with explicit Donna and lifecycle instructions**
 
 ```markdown
 ---
-name: codex-runners
-description: Operate an initialized Codex Runners project, including Donna, its Kanban board, persistent role pools, and autonomous ticket delivery.
+name: agents-runners
+description: Operate an initialized Agents Runners project, including Donna, its Kanban board, persistent role pools, and autonomous ticket delivery.
 ---
 
-# Codex Runners
+# Agents Runners
 
-When `.codex-runners/config.json` exists, begin by calling `get_project` and `get_board`. Treat Backlog as inactive. Use revision-protected MCP writes for every board change. Send orchestration requests to Donna instead of creating unmanaged background Codex processes.
+When `.agents-runners/config.json` exists, begin by calling `get_project` and `get_board`. Treat Backlog as inactive. Use revision-protected MCP writes for every board change. Send orchestration requests to Donna instead of creating unmanaged background Codex processes.
 ```
 
 - [ ] **Step 5: Finalize manifest metadata, MCP launch path, README, configuration, and architecture docs**
 
 ```json
 {
-  "name": "codex-runners",
+  "name": "agents-runners",
   "version": "0.1.0",
   "description": "Local autonomous Kanban orchestration for persistent Codex runners",
   "author": { "name": "Abhijay Rajvansh" },
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "Codex Runners",
+    "displayName": "Agents Runners",
     "shortDescription": "Donna coordinates persistent Codex delivery teams.",
     "longDescription": "Run a local bidirectional Kanban board with Donna, persistent developer, reviewer, and QA pools, isolated worktrees, and autonomous delivery into dev.",
     "developerName": "Abhijay Rajvansh",
     "category": "Productivity",
     "capabilities": ["Interactive", "Write"],
-    "defaultPrompt": ["Open Codex Runners for this project.", "Ask Donna to plan the current backlog.", "Show active runners and blockers."]
+    "defaultPrompt": ["Open Agents Runners for this project.", "Ask Donna to plan the current backlog.", "Show active runners and blockers."]
   }
 }
 ```
@@ -847,14 +847,14 @@ When `.codex-runners/config.json` exists, begin by calling `get_project` and `ge
 
 Run: `npm run build && npm test -- tests/integration/distribution.test.ts`
 
-Run: `python3 /Users/abhijayrajvansh/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/codex-runners`
+Run: `python3 /Users/abhijayrajvansh/.codex/skills/.system/skill-creator/scripts/quick_validate.py skills/agents-runners`
 
 Run: `python3 /Users/abhijayrajvansh/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py .`
 
 Expected: all commands PASS in an isolated Python environment containing PyYAML.
 
 ```bash
-git add skills/codex-runners/SKILL.md README.md docs/configuration.md docs/architecture.md .codex-plugin/plugin.json .mcp.json package.json tests/integration/distribution.test.ts
+git add skills/agents-runners/SKILL.md README.md docs/configuration.md docs/architecture.md .codex-plugin/plugin.json .mcp.json package.json tests/integration/distribution.test.ts
 git commit -m "docs: package complete codex runners plugin"
 ```
 
@@ -867,7 +867,7 @@ git commit -m "docs: package complete codex runners plugin"
 
 **Interfaces:**
 - Consumes the complete built plugin.
-- Produces an installed `codex-runners@personal` plugin and verified temporary-project workflow.
+- Produces an installed `agents-runners@personal` plugin and verified temporary-project workflow.
 
 - [ ] **Step 1: Run the complete deterministic release gate**
 
@@ -877,15 +877,15 @@ Expected: type checking, all Vitest suites, node/web builds, and Playwright suit
 
 - [ ] **Step 2: Validate the plugin and marketplace entry in an isolated Python environment**
 
-Run: `uv run --with pyyaml python /Users/abhijayrajvansh/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py /Users/abhijayrajvansh/plugins/codex-runners`
+Run: `uv run --with pyyaml python /Users/abhijayrajvansh/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py /Users/abhijayrajvansh/plugins/agents-runners`
 
 Expected: plugin validation PASS.
 
 - [ ] **Step 3: Update the local cachebuster and reinstall from the personal marketplace**
 
-Run: `python3 /Users/abhijayrajvansh/.codex/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py /Users/abhijayrajvansh/plugins/codex-runners`
+Run: `python3 /Users/abhijayrajvansh/.codex/skills/.system/plugin-creator/scripts/update_plugin_cachebuster.py /Users/abhijayrajvansh/plugins/agents-runners`
 
-Run: `codex plugin add codex-runners@personal`
+Run: `codex plugin add agents-runners@personal`
 
 Expected: Codex reports the plugin installed successfully.
 
@@ -897,7 +897,7 @@ Expected: config, managed AGENTS.md block, hooks, and gitignore entries are crea
 
 - [ ] **Step 5: Start the daemon and verify the complete fake-runner workflow**
 
-Run: `CODEX_RUNNERS_FAKE_RUNNER=1 node dist/bin/cli.mjs start`
+Run: `AGENTS_RUNNERS_FAKE_RUNNER=1 node dist/bin/cli.mjs start`
 
 Create a ticket, move it to Todo, and observe developer, reviewer, QA, integration, and Done events through API/WebSocket.
 

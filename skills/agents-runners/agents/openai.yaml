@@ -1,0 +1,4 @@
+interface:
+  display_name: "Agents Runners"
+  short_description: "Operate Donna and autonomous runner boards"
+  default_prompt: "Use $agents-runners to open this project board and coordinate the next ticket with Donna."

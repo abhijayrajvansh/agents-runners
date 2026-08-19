@@ -3,19 +3,19 @@ import { ArrowUp, Check, ChevronDown, PanelLeftClose, Sparkles } from "lucide-re
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { DonnaConversationMessage } from "../../../src/runtime/project-runtime.js";
-import type { CodexModelOption } from "../../../src/runners/codex-models.js";
+import type { AgentModelOption } from "../../../src/runners/agent-models.js";
 
 export type DonnaRailProps = {
   projectName: string;
   messages?: DonnaConversationMessage[];
   model?: string;
-  models?: CodexModelOption[];
+  models?: AgentModelOption[];
   onModelChange?(model: string): Promise<void>;
   onSend(message: string): Promise<string>;
   onCollapse(): void;
 };
 
-export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", models = [], onModelChange, onSend, onCollapse }: DonnaRailProps) {
+export function DonnaRail({ projectName, messages = [], model = "", models = [], onModelChange, onSend, onCollapse }: DonnaRailProps) {
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
   const [modelOpen, setModelOpen] = useState(false);
@@ -23,8 +23,9 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
   const visibleMessages = messages.length > 0 ? messages : fallbackMessages;
   const messagesElement = useRef<HTMLDivElement>(null);
   const modelPickerElement = useRef<HTMLDivElement>(null);
-  const nativeModels = models.filter(option => option.source === "Codex");
-  const routerModels = models.filter(option => option.source === "Codex Router");
+  // Catalogs differ per agent, so the menu groups by whatever sources arrive
+  // rather than by a fixed list of Codex-only sections.
+  const modelSources = [...new Set(models.map(option => option.source))];
 
   useEffect(() => {
     const element = messagesElement.current;
@@ -94,19 +95,23 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
         <div className="donna-composer__toolbar">
           <div className="donna-model" ref={modelPickerElement}>
             <button type="button" className="donna-model__trigger" aria-haspopup="listbox" aria-expanded={modelOpen} onClick={() => setModelOpen(open => !open)}>
-              {models.find(option => option.id === model)?.label ?? model}<ChevronDown size={11} />
+              {models.find(option => option.id === model)?.label ?? model ?? "Default model"}<ChevronDown size={11} />
             </button>
             {modelOpen && (
               <div className="donna-model__menu" role="listbox" aria-label="Available Donna models">
-                {!models.some(option => option.id === model) && <ModelOption id={model} label={model} active onSelect={() => setModelOpen(false)} />}
-                <ModelGroup label="Codex" options={nativeModels} activeModel={model} onSelect={selected => {
-                  setModelOpen(false);
-                  void onModelChange?.(selected);
-                }} />
-                <ModelGroup label="Codex Router" options={routerModels} activeModel={model} onSelect={selected => {
-                  setModelOpen(false);
-                  void onModelChange?.(selected);
-                }} />
+                {model && !models.some(option => option.id === model) && <ModelOption id={model} label={model} active onSelect={() => setModelOpen(false)} />}
+                {modelSources.map(source => (
+                  <ModelGroup
+                    key={source}
+                    label={source}
+                    options={models.filter(option => option.source === source)}
+                    activeModel={model}
+                    onSelect={selected => {
+                      setModelOpen(false);
+                      void onModelChange?.(selected);
+                    }}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -132,7 +137,7 @@ export function DonnaRail({ projectName, messages = [], model = "gpt-5.6-luna", 
 
 function ModelGroup({ label, options, activeModel, onSelect }: {
   label: string;
-  options: CodexModelOption[];
+  options: AgentModelOption[];
   activeModel: string;
   onSelect(model: string): void;
 }) {

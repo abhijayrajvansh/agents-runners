@@ -10,9 +10,13 @@ type HookGroup = {
   hooks: CommandHook[];
 };
 
+// Codex keeps hooks in `.codex/hooks.json` and Claude Code keeps them among
+// everything else in `.claude/settings.json`. The hooks block is shaped the
+// same in both, so one merge serves both as long as it preserves the keys it
+// does not own.
 type HooksDocument = {
-  description?: string;
   hooks: Record<string, HookGroup[]>;
+  [key: string]: unknown;
 };
 
 function escapeRegExp(value: string): string {
@@ -45,29 +49,31 @@ export function appendUniqueLines(source: string, lines: string[]): string {
 export function mergeSessionStartHook(
   input: unknown,
   cliPath: string,
-  nodePath: string
+  nodePath: string,
+  agent: "codex" | "claude" = "codex"
 ): HooksDocument {
-  const base = isHooksDocument(input) ? structuredClone(input) : { hooks: {} };
+  const base: HooksDocument = isRecord(input)
+    ? { ...structuredClone(input), hooks: isRecord(input.hooks) ? structuredClone(input.hooks) as Record<string, HookGroup[]> : {} }
+    : { hooks: {} };
   const sessionStart = base.hooks.SessionStart ?? [];
   const retained = sessionStart.filter(group => !group.hooks.some(hook => (
     hook.command.includes("hook session-start") &&
-    (hook.command.includes("codex-runners") || hook.command.includes("cli.mjs"))
+    (hook.command.includes("agents-runners") || hook.command.includes("cli.mjs"))
   )));
-  const command = `${shellQuote(nodePath)} ${shellQuote(cliPath)} hook session-start`;
+  const command = `${shellQuote(nodePath)} ${shellQuote(cliPath)} hook session-start --agent ${agent}`;
   retained.push({
     matcher: "startup|resume",
     hooks: [{
       type: "command",
       command,
       timeout: 10,
-      statusMessage: "Starting Codex Runners"
+      statusMessage: "Starting Agents Runners"
     }]
   });
   base.hooks.SessionStart = retained;
   return base;
 }
 
-function isHooksDocument(value: unknown): value is HooksDocument {
-  return typeof value === "object" && value !== null && "hooks" in value &&
-    typeof (value as { hooks?: unknown }).hooks === "object" && (value as { hooks?: unknown }).hooks !== null;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

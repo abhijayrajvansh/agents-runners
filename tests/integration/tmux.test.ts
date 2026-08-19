@@ -15,8 +15,8 @@ afterEach(async () => {
 
 describe("TmuxService", () => {
   it("keeps the runner pane alive after a structured command completes", async () => {
-    const directory = await mkdtemp(path.join(tmpdir(), "codex-runners-tmux-"));
-    const session = `codex-runners-test-${process.pid}-${Date.now()}`;
+    const directory = await mkdtemp(path.join(tmpdir(), "agents-runners-tmux-"));
+    const session = `agents-runners-test-${process.pid}-${Date.now()}`;
     const service = new TmuxService(new CommandRunner());
     cleanups.push(async () => {
       await service.killSession(session).catch(() => undefined);

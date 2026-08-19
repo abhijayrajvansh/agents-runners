@@ -14,7 +14,7 @@ describe("RunnerInspector", () => {
       slot: 1,
       status: "working",
       worktreePath: "/tmp/developer-01",
-      branch: "codex-runners/developer-01",
+      branch: "agents-runners/developer-01",
       tmuxTarget: "northstar:developer-01",
       ticketId: "auth"
     }]} />);
@@ -24,7 +24,7 @@ describe("RunnerInspector", () => {
     fireEvent.click(trigger);
 
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("codex-runners/developer-01")).toBeVisible();
+    expect(screen.getByText("agents-runners/developer-01")).toBeVisible();
     expect(screen.getByText("northstar:developer-01")).toBeVisible();
   });
 });

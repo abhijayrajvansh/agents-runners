@@ -34,8 +34,8 @@ describe("WorktreeService", () => {
     const second = await service.ensureRunner(config, "developer", 1);
 
     expect(first).toEqual(second);
-    expect(first.branch).toBe("codex-runners/developer-01");
-    expect(first.worktreePath).toBe(path.join(project.root, ".worktrees", "codex-runners", "developer-01"));
+    expect(first.branch).toBe("agents-runners/developer-01");
+    expect(first.worktreePath).toBe(path.join(project.root, ".worktrees", "agents-runners", "developer-01"));
     await expect(access(path.join(first.worktreePath, ".git"))).resolves.toBeUndefined();
     expect(await readFile(path.join(first.worktreePath, ".env.development"), "utf8"))
       .toBe("FAKE_KEY=development-only\n");

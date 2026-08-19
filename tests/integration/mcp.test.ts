@@ -15,7 +15,7 @@ afterEach(async () => {
   await Promise.all(cleanups.splice(0).map(cleanup => cleanup()));
 });
 
-describe("Codex Runners MCP tools", () => {
+describe("Agents Runners MCP tools", () => {
   it("advertises and executes the complete typed MCP surface", async () => {
     const calls: string[] = [];
     const server = createMcpServer(async (name, input) => {
@@ -116,7 +116,7 @@ function harness(registry: ProjectRegistry, events: EventBus): McpTools {
         slot: 1,
         status: "idle",
         worktreePath: "/tmp/developer-01",
-        branch: "codex-runners/developer-01",
+        branch: "agents-runners/developer-01",
         tmuxTarget: "demo:developer-01"
       }],
       get: (_projectId, runnerId) => runnerId === "developer-01" ? {
@@ -125,7 +125,7 @@ function harness(registry: ProjectRegistry, events: EventBus): McpTools {
         slot: 1,
         status: "idle",
         worktreePath: "/tmp/developer-01",
-        branch: "codex-runners/developer-01",
+        branch: "agents-runners/developer-01",
         tmuxTarget: "demo:developer-01"
       } : undefined
     },

@@ -53,7 +53,7 @@ export async function stopDaemon(runtimeRoot: string): Promise<DaemonStatus> {
       return { ...status, running: false };
     }
   }
-  throw new Error(`Codex Runners daemon ${status.pid} did not stop within 2.5 seconds`);
+  throw new Error(`Agents Runners daemon ${status.pid} did not stop within 2.5 seconds`);
 }
 
 function isProcessAlive(pid: number): boolean {

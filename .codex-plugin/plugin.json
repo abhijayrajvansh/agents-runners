@@ -1,7 +1,7 @@
 {
-  "name": "codex-runners",
+  "name": "agents-runners",
   "version": "0.1.0+codex.20260819090008",
-  "description": "Run a local realtime skill-flow board with Donna and persistent autonomous Codex runners, using Matt Pocock's composable engineering skills.",
+  "description": "Run a local realtime skill-flow board with Donna and persistent autonomous runners on Codex or Claude Code, using Matt Pocock's composable engineering skills.",
   "author": {
     "name": "Abhijay Rajvansh"
   },
@@ -18,9 +18,9 @@
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "Codex Runners",
-    "shortDescription": "Donna and the skill-driven Codex runner board",
-    "longDescription": "Operate a local issue board where Donna coordinates persistent Codex runners through the bundled Matt Pocock flow: grill-with-docs, to-spec, to-tickets, implement, and code-review, from triage through verified delivery.",
+    "displayName": "Agents Runners",
+    "shortDescription": "Donna and the skill-driven runner board",
+    "longDescription": "Operate a local issue board where Donna coordinates persistent Codex or Claude Code runners through the bundled Matt Pocock flow: grill-with-docs, to-spec, to-tickets, implement, and code-review, from triage through verified delivery.",
     "developerName": "Abhijay Rajvansh",
     "category": "Productivity",
     "capabilities": [
@@ -28,7 +28,7 @@
       "Write"
     ],
     "defaultPrompt": [
-      "Open this project's Codex Runners skill-flow board.",
+      "Open this project's Agents Runners skill-flow board.",
       "Ask Donna to route the next issue or cut it into tickets with /to-tickets."
     ]
   }

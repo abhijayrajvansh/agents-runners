@@ -1,19 +1,21 @@
 ---
-name: codex-runners
-description: "Use when working in a project containing .codex-runners/config.json, operating Donna, managing the local skill-flow board, inspecting persistent runners, or coordinating skill-driven triage, review, implementation, and delivery."
+name: agents-runners
+description: "Use when working in a project containing .agents-runners/config.json, operating Donna, managing the local skill-flow board, inspecting persistent runners, or coordinating skill-driven triage, review, implementation, and delivery."
 ---
 
-# Codex Runners
+# Agents Runners
 
 ## Overview
 
-Treat Codex Runners as the shared operational record for the project's skill-driven work. It runs a local issue board that supports the full Matt Pocock flow bundled under `skills/`: `/grill-with-docs` for planning, `/to-spec` to record a spec, `/to-tickets` to cut tracer-bullet tickets with blocking edges, `/implement` to build one ticket, and `/code-review` before delivery. `/triage` routes inbound issues, and `/wayfinder` charts efforts too big for one session.
+Treat Agents Runners as the shared operational record for the project's skill-driven work. It runs a local issue board that supports the full Matt Pocock flow bundled under `skills/`: `/grill-with-docs` for planning, `/to-spec` to record a spec, `/to-tickets` to cut tracer-bullet tickets with blocking edges, `/implement` to build one ticket, and `/code-review` before delivery. `/triage` routes inbound issues, and `/wayfinder` charts efforts too big for one session.
 
 Keep plans, assignments, progress, and delivery state synchronized through the MCP tools; use Donna as the canonical project-manager conversation.
 
+Runners are driven by the agent CLI named in `agent.kind`, either Codex or Claude Code. Read it from `get_project` before describing what a runner is doing, and never assume one CLI's flags, models, or thread semantics apply to the other.
+
 ## Operate a project
 
-1. Confirm `.codex-runners/config.json` exists. If the user asks to set up an uninitialized repository, run `codex-runners init` from its Git root.
+1. Confirm `.agents-runners/config.json` exists. If the user asks to set up an uninitialized repository, run `agents-runners init` from its Git root.
 2. Call `get_project`, then `get_board`. Retain the returned board revision.
 3. Model work as issues. Capture planning work as `backlog` or `needs_triage`. Move an issue to `ready_for_agent` only when it is fully specified and the user or Donna intends an autonomous runner to implement it.
 4. Include the latest `expectedRevision` in every write. On a revision conflict, fetch the board again, reconcile the user’s intended change, and retry once with the new revision.
@@ -37,10 +39,10 @@ Triage statuses (`needs_triage`, `needs_info`, `ready_for_human`, `wontfix`) are
 
 ## Preserve runner state
 
-- Keep runner identities, worktrees, branches, tmux panes, and Codex thread IDs persistent while Idle.
+- Keep runner identities, worktrees, branches, tmux panes, and agent thread IDs persistent while Idle.
 - Route review or QA findings back through the issue. Let the scheduler resume the same developer.
 - Let the serialized integration lane merge and push the configured integration branch. Do not merge runner branches manually while automation is active.
-- Never delete or reset user worktrees. Codex Runners may synchronize only its own clean, managed runner worktrees.
+- Never delete or reset user worktrees. Agents Runners may synchronize only its own clean, managed runner worktrees.
 - Prefer the bundled skill flow over inventing a new process: `/grill-with-docs` before a spec, `/to-tickets` before a multi-session build, `/implement` per vertical-slice ticket, `/code-review` with the originating spec, and `/wayfinder` for efforts too large for one session.
 
 ## Protect environments
@@ -50,13 +52,13 @@ Use only environment filenames and profiles recorded in config. Never read, quot
 ## CLI quick reference
 
 ```text
-codex-runners init      Initialize the current Git project
-codex-runners start     Start and register the project
-codex-runners open      Open its local board
-codex-runners donna     Continue the shared Donna thread
-codex-runners status    Inspect daemon state
-codex-runners doctor    Check Node, Git, tmux, Codex, auth, branch, and daemon
-codex-runners stop      Stop processes; preserve all persistent runner state
+agents-runners init      Initialize the current Git project (--agent codex|claude)
+agents-runners start     Start and register the project
+agents-runners open      Open its local board
+agents-runners donna     Continue the shared Donna thread
+agents-runners status    Inspect daemon state
+agents-runners doctor    Check Node, Git, tmux, the project's agent CLI, auth, branch, and daemon
+agents-runners stop      Stop processes; preserve all persistent runner state
 ```
 
 ## Common mistakes

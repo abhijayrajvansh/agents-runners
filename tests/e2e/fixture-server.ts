@@ -21,8 +21,8 @@ const runners: RunnerRecord[] = (["developer", "reviewer", "qa"] as const).map((
   role,
   slot: 1,
   status: "idle",
-  worktreePath: path.join(initialized.root, ".worktrees", "codex-runners", `${role}-01`),
-  branch: `codex-runners/${role}-01`,
+  worktreePath: path.join(initialized.root, ".worktrees", "agents-runners", `${role}-01`),
+  branch: `agents-runners/${role}-01`,
   tmuxTarget: `${project.project.id}:${role}-01`
 }));
 const automation = {

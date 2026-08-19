@@ -2,35 +2,37 @@ import path from "node:path";
 
 import type { IntegrationService } from "../git/integration-service.js";
 import { projectRuntimePath } from "../platform/paths.js";
-import type { CodexEvent, CodexService, CodexTurnInput } from "../runners/codex-service.js";
+import { resolveRoleAgent } from "../domain/agent-selection.js";
+import type { AgentEvent, AgentService, AgentTurnInput } from "../runners/agent-service.js";
 import type { TmuxPane } from "../runners/tmux-service.js";
 import type { ProjectRuntimeRepository } from "../runtime/project-runtime.js";
 import { buildStagePrompt } from "./ticket-prompts.js";
 import type { StageExecution, StageExecutionResult, StageExecutor } from "./scheduler.js";
 
-type CodexTurnRunner = Pick<CodexService, "runTurn">;
+type AgentTurnRunner = Pick<AgentService, "runTurn" | "providerFor">;
 type BranchIntegrator = Pick<IntegrationService, "integrate">;
 
-export class CodexStageExecutor implements StageExecutor {
-  readonly codex: CodexTurnRunner;
+export class AgentStageExecutor implements StageExecutor {
+  readonly agents: AgentTurnRunner;
   readonly integration: BranchIntegrator;
-  readonly onEvent: ((input: StageExecution, event: CodexEvent) => void) | undefined;
+  readonly onEvent: ((input: StageExecution, event: AgentEvent) => void) | undefined;
   readonly runtime: ProjectRuntimeRepository | undefined;
 
   constructor(
-    codex: CodexTurnRunner,
+    agents: AgentTurnRunner,
     integration: BranchIntegrator,
-    onEvent?: (input: StageExecution, event: CodexEvent) => void,
+    onEvent?: (input: StageExecution, event: AgentEvent) => void,
     runtime?: ProjectRuntimeRepository
   ) {
-    this.codex = codex;
+    this.agents = agents;
     this.integration = integration;
     this.onEvent = onEvent;
     this.runtime = runtime;
   }
 
   async execute(input: StageExecution): Promise<StageExecutionResult> {
-    const turnInput: CodexTurnInput = {
+    const agent = resolveRoleAgent(input.project, input.runner.role, selection => this.agents.providerFor(selection));
+    const turnInput: AgentTurnInput = {
       pane: paneFor(input),
       runtimeDirectory: path.join(
         projectRuntimePath(input.project.project.repositoryRoot),
@@ -40,12 +42,13 @@ export class CodexStageExecutor implements StageExecutor {
       worktreePath: input.runner.worktreePath,
       prompt: buildStagePrompt(input.project, input.ticket, input.runner, input.runtime),
       fullAccess: input.project.automation.fullAccess,
-      model: input.project.pools[input.runner.role].model ?? "gpt-5.6-sol",
-      reasoningEffort: input.project.pools[input.runner.role].reasoningEffort ?? "medium",
-      env: { CODEX_RUNNERS_PROJECT_ROOT: input.project.project.repositoryRoot }
+      agent: agent.selection,
+      model: agent.model,
+      reasoningEffort: agent.reasoningEffort,
+      env: { AGENTS_RUNNERS_PROJECT_ROOT: input.project.project.repositoryRoot }
     };
     if (input.runner.threadId) turnInput.threadId = input.runner.threadId;
-    const result = await this.codex.runTurn(turnInput, event => {
+    const result = await this.agents.runTurn(turnInput, event => {
       if (event.type === "thread.started") {
         input.runner.threadId = event.threadId;
         this.runtime?.setRunnerThread(input.project.project.id, input.runner.id, event.threadId);
@@ -59,7 +62,7 @@ export class CodexStageExecutor implements StageExecutor {
     if (result.exitCode !== 0) {
       return {
         kind: "failed",
-        summary: `Codex runner exited with code ${result.exitCode}`,
+        summary: `${agent.selection.kind} runner exited with code ${result.exitCode}`,
         findings: result.message ? [result.message] : ["Inspect the persistent runner log for details."]
       };
     }
@@ -96,7 +99,7 @@ export function parseStageResult(message: string): StageExecutionResult {
       const decision = normalizeDecision(parsed);
       return { kind: outcome, summary, findings, ...(decision ? { decision } : {}) };
     } catch {
-      // Codex may include prose before its structured final line.
+      // An agent may include prose before its structured final line.
     }
   }
   return {

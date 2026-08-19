@@ -1,4 +1,4 @@
-# Codex Runners Plugin
+# Agents Runners Plugin
 
 ## Agent skills
 

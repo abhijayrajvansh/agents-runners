@@ -116,7 +116,7 @@ async function workflowHarness(root: string, executor: ScriptedExecutor, limits:
         slot,
         status: "idle",
         worktreePath: `/tmp/${createdRole}-${slot}`,
-        branch: `codex-runners/${createdRole}-${String(slot).padStart(2, "0")}`,
+        branch: `agents-runners/${createdRole}-${String(slot).padStart(2, "0")}`,
         tmuxTarget: `${config.project.id}:${createdRole}-${slot}`
       }))
     ])

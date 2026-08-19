@@ -5,7 +5,7 @@ import { ticketSearchScore } from "../domain/ticket-search.js";
 import type { DonnaService, DonnaMessageSource } from "../donna/donna-service.js";
 import { MCP_TOOL_NAMES, type McpToolName, type McpTools } from "../mcp/tools.js";
 import type { AutomationManager } from "../orchestration/automation-manager.js";
-import { listAvailableCodexModels } from "../runners/codex-models.js";
+import { listAvailableModels } from "../runners/agent-models.js";
 import { StoreError } from "../storage/atomic-json-store.js";
 import type { EventBus } from "./event-bus.js";
 import { ProjectRegistryError, type ProjectRegistry } from "./project-registry.js";
@@ -39,7 +39,7 @@ export function createApp(dependencies: AppDependencies): Express {
         next();
         return;
       }
-      response.status(401).send("This Codex Runners link requires its private access token.");
+      response.status(401).send("This Agents Runners link requires its private access token.");
     });
   }
   app.use(express.json({ limit: "1mb" }));
@@ -62,8 +62,11 @@ export function createApp(dependencies: AppDependencies): Express {
     response.json({ projects: dependencies.registry.list().map(config => config.project) });
   });
 
-  app.get("/api/models", asyncRoute(async (_request, response) => {
-    response.json({ models: await listAvailableCodexModels() });
+  app.get("/api/models", asyncRoute(async (request, response) => {
+    const agent = request.query.agent;
+    response.json({
+      models: await listAvailableModels(agent === "codex" || agent === "claude" ? agent : undefined)
+    });
   }));
 
   app.get("/api/search/tickets", (request, response) => {

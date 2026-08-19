@@ -29,12 +29,12 @@ export async function ensureDaemonForProject(
     }
   }
 
-  if (!healthy) throw new Error(`Codex Runners daemon did not become ready at ${healthUrl}`);
+  if (!healthy) throw new Error(`Agents Runners daemon did not become ready at ${healthUrl}`);
   const registered = await dependencies.request(`${baseUrl}/api/projects/register`, {
     method: "POST",
     body: { root: config.project.repositoryRoot }
   });
-  if (!registered.ok) throw new Error(`Codex Runners could not register ${config.project.repositoryRoot}`);
+  if (!registered.ok) throw new Error(`Agents Runners could not register ${config.project.repositoryRoot}`);
 
   return { url: `${baseUrl}/projects/${config.project.id}`, started };
 }

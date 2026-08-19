@@ -48,8 +48,8 @@ describe("project session list", () => {
         slot: 1,
         status: "working",
         worktreePath: "/worktrees/reviewer-01",
-        branch: "codex-runners/reviewer-01",
-        tmuxTarget: "codex-runners-com:reviewer-01",
+        branch: "agents-runners/reviewer-01",
+        tmuxTarget: "agents-runners-com:reviewer-01",
         ticketId: "schema"
       },
       {
@@ -58,8 +58,8 @@ describe("project session list", () => {
         slot: 1,
         status: "idle",
         worktreePath: "/worktrees/developer-01",
-        branch: "codex-runners/developer-01",
-        tmuxTarget: "codex-runners-com:developer-01"
+        branch: "agents-runners/developer-01",
+        tmuxTarget: "agents-runners-com:developer-01"
       }
     ];
 

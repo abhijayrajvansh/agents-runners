@@ -32,7 +32,7 @@ export type DaemonHandle = {
 
 export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHandle> {
   if (options.host !== "127.0.0.1") {
-    throw new Error("Codex Runners v1 only permits the 127.0.0.1 loopback host");
+    throw new Error("Agents Runners v1 only permits the 127.0.0.1 loopback host");
   }
   const runtime = new RuntimeStore(options.runtimeRoot);
   const releaseLock = await runtime.acquireLock();
@@ -46,7 +46,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
   const donna = new DonnaService({
     registry,
     events,
-    codex: automation.codex,
+    agents: automation.agents,
     tmux: automation.tmux,
     runtimeFor: project => automation.runtimeFor(project)
   });
@@ -91,7 +91,7 @@ export async function startDaemon(options: StartDaemonOptions): Promise<DaemonHa
     automation.close();
     sockets.close();
     await releaseLock();
-    throw new Error("Codex Runners daemon did not bind a TCP address");
+    throw new Error("Agents Runners daemon did not bind a TCP address");
   }
   let tunnel: PublicTunnel | undefined;
   if (options.enablePublicTunnel) {

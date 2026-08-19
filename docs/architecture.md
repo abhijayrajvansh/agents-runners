@@ -1,6 +1,6 @@
 # Architecture
 
-Codex Runners uses one loopback Node.js daemon for every initialized local project. Work is modelled as skill-flow issues: planning and triage produce fully-specified `ready_for_agent` issues (or wayfinder decision tickets for un-specable efforts), and the delivery engine below implements them one vertical slice at a time with persistent Codex runners.
+Agents Runners uses one loopback Node.js daemon for every initialized local project. Work is modelled as skill-flow issues: planning and triage produce fully-specified `ready_for_agent` issues (or wayfinder decision tickets for un-specable efforts), and the delivery engine below implements them one vertical slice at a time with persistent Codex runners.
 
 ```text
 Codex CLI / Browser / Terminal
@@ -21,8 +21,8 @@ Codex CLI / Browser / Terminal
 
 ## Sources of truth
 
-- `.codex-runners/config.json` stores the visible project configuration and complete Kanban board.
-- `.codex-runners/runtime/project-runtime.json` stores retry counts, runner affinity, integration commits, Donna’s thread ID, and runner thread IDs.
+- `.agents-runners/config.json` stores the visible project configuration and complete Kanban board.
+- `.agents-runners/runtime/project-runtime.json` stores retry counts, runner affinity, integration commits, Donna’s thread ID, and runner thread IDs.
 - the user runtime directory stores daemon PID metadata and the set of registered project roots.
 - WebSocket event history is bounded and ephemeral; it accelerates UI updates but never replaces the board.
 

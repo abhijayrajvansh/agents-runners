@@ -1,0 +1,14 @@
+{
+  "name": "agents-runners",
+  "owner": {
+    "name": "Abhijay Rajvansh"
+  },
+  "plugins": [
+    {
+      "name": "agents-runners",
+      "source": "./",
+      "description": "Donna and the skill-driven runner board, on Codex or Claude Code."
+    }
+  ],
+  "description": "Skill-driven autonomous delivery: a local issue board, a persistent PM, and runner pools on Codex or Claude Code."
+}

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Codex Runners"
-  short_description: "Operate Donna and autonomous runner boards"
-  default_prompt: "Use $codex-runners to open this project board and coordinate the next ticket with Donna."

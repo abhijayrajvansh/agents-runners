@@ -2,7 +2,8 @@ import path from "node:path";
 
 import type { ProjectConfig } from "../domain/types.js";
 import { projectRuntimePath } from "../platform/paths.js";
-import type { CodexEvent, CodexService, CodexTurnInput } from "../runners/codex-service.js";
+import { resolveDonnaAgent } from "../domain/agent-selection.js";
+import type { AgentEvent, AgentService, AgentTurnInput } from "../runners/agent-service.js";
 import type { TmuxService } from "../runners/tmux-service.js";
 import type { DonnaConversationMessage, ProjectRuntimeRepository } from "../runtime/project-runtime.js";
 import type { EventBus } from "../server/event-bus.js";
@@ -19,7 +20,7 @@ export type DonnaMessageSource = "browser" | "terminal" | "mcp";
 type DonnaDependencies = {
   registry: ProjectRegistry;
   events: EventBus;
-  codex: Pick<CodexService, "runTurn">;
+  agents: Pick<AgentService, "runTurn" | "providerFor">;
   tmux: Pick<TmuxService, "ensurePane">;
   runtimeFor(project: ProjectConfig): ProjectRuntimeRepository;
 };
@@ -106,19 +107,21 @@ export class DonnaService {
     emit({ type: "started", projectId, source });
     let lastMessage = "";
     const savedThreadId = runtime.getDonnaThread(projectId);
-    const turnInput = (threadId?: string): CodexTurnInput => ({
+    const agent = resolveDonnaAgent(project, selection => this.dependencies.agents.providerFor(selection));
+    const turnInput = (threadId?: string): AgentTurnInput => ({
       pane,
       runtimeDirectory: path.join(projectRuntimePath(project.project.repositoryRoot), "donna"),
       worktreePath: project.project.repositoryRoot,
       prompt: buildDonnaPrompt(project, message, recentConversation),
       fullAccess: project.automation.fullAccess,
-      model: project.donna?.model ?? "gpt-5.6-luna",
-      reasoningEffort: project.donna?.reasoningEffort ?? "low",
+      agent: agent.selection,
+      model: agent.model,
+      reasoningEffort: agent.reasoningEffort,
       timeoutMs: project.donna?.timeoutMs ?? 180_000,
-      env: { CODEX_RUNNERS_PROJECT_ROOT: project.project.repositoryRoot },
+      env: { AGENTS_RUNNERS_PROJECT_ROOT: project.project.repositoryRoot },
       ...(threadId ? { threadId } : {})
     });
-    const handleEvent = (event: CodexEvent) => {
+    const handleEvent = (event: AgentEvent) => {
       if (event.type === "thread.started") runtime.setDonnaThread(projectId, event.threadId);
       if (event.type !== "message.completed") return;
       lastMessage = event.text;
@@ -126,11 +129,11 @@ export class DonnaService {
       emit(donnaEvent);
       this.#publish(projectId, donnaEvent);
     };
-    let result = await this.dependencies.codex.runTurn(turnInput(savedThreadId), handleEvent);
+    let result = await this.dependencies.agents.runTurn(turnInput(savedThreadId), handleEvent);
     if (savedThreadId && result.exitCode !== 0) {
       runtime.clearDonnaThread(projectId);
       lastMessage = "";
-      result = await this.dependencies.codex.runTurn(turnInput(), handleEvent);
+      result = await this.dependencies.agents.runTurn(turnInput(), handleEvent);
     }
     if (result.exitCode !== 0) throw new Error(`Donna exited with code ${result.exitCode}: ${result.message}`);
     if (result.threadId) runtime.setDonnaThread(projectId, result.threadId);
@@ -232,7 +235,7 @@ function buildDonnaPrompt(project: ProjectConfig, message: string, recentConvers
     : "No earlier messages.";
   return [
     `You are Donna, the persistent project manager for ${project.project.name}.`,
-    "Coordinate skill-driven work through Codex Runners MCP tools. Create clear issues, manage dependencies and assignments, inspect runner progress, and explain blockers. Guide planning with /grill-with-docs, record specs with /to-spec, cut vertical-slice tickets with /to-tickets, and route inbound work with /triage. You are a project manager, not a coding worker. Never edit project files, run implementation commands, commit code, or implement an issue yourself. Delegate implementation, review, and verification to the runner pools.",
+    "Coordinate skill-driven work through Agents Runners MCP tools. Create clear issues, manage dependencies and assignments, inspect runner progress, and explain blockers. Guide planning with /grill-with-docs, record specs with /to-spec, cut vertical-slice tickets with /to-tickets, and route inbound work with /triage. You are a project manager, not a coding worker. Never edit project files, run implementation commands, commit code, or implement an issue yourself. Delegate implementation, review, and verification to the runner pools.",
     "Talk like a thoughtful human project manager. Answer the question directly without restating it or announcing what you are about to do. Use plain words and natural contractions. Vary sentence and paragraph length. You can have a point of view, admit uncertainty, and use a brief aside when it helps.",
     "Avoid corporate AI prose, forced enthusiasm, canned acknowledgments, rhetorical reversals, fake punchlines, and inflated claims. Do not say 'Great question', 'I hope this helps', 'let us dive in', or 'Would you like me to'. Prefer 'is' and 'has' over phrases like 'serves as' or 'boasts'. Do not use em dashes. Never invent facts, progress, blockers, commits, or citations.",
     "Use GitHub-flavored Markdown only when it makes the answer easier to scan. Keep headings rare, avoid bolding every label, put each list item on its own line, and use readable inline code for ticket IDs and commands.",
@@ -268,7 +271,7 @@ function isResumeRequest(message: string): boolean {
 }
 
 function sessionName(projectId: string): string {
-  return `codex-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
+  return `agents-runners-${projectId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
 }
 
 class AsyncEventQueue<T> implements AsyncIterable<T> {

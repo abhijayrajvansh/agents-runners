@@ -15,7 +15,7 @@ import { MCP_TOOL_NAMES, type McpToolName } from "./tools.js";
 export type McpToolCaller = (name: McpToolName, input: Record<string, unknown>) => Promise<unknown>;
 
 export function createMcpServer(callTool: McpToolCaller): McpServer {
-  const server = new McpServer({ name: "codex-runners", version: "0.1.0" });
+  const server = new McpServer({ name: "agents-runners", version: "0.1.0" });
   for (const name of MCP_TOOL_NAMES) {
     server.registerTool(name, {
       description: descriptionFor(name),
@@ -32,7 +32,7 @@ export function createMcpServer(callTool: McpToolCaller): McpServer {
 }
 
 export async function runStdioMcpServer(
-  projectRoot = process.env.CODEX_RUNNERS_PROJECT_ROOT ?? process.cwd()
+  projectRoot = process.env.AGENTS_RUNNERS_PROJECT_ROOT ?? process.cwd()
 ): Promise<void> {
   const server = createMcpServer(async (name, input) => {
     const requestedRoot = typeof input.projectRoot === "string" && input.projectRoot.trim().length > 0
@@ -46,7 +46,7 @@ export async function runStdioMcpServer(
       body: JSON.stringify({ ...input, projectRoot: requestedRoot })
     });
     const body = await response.json() as { error?: { message?: string } };
-    if (!response.ok) throw new Error(body.error?.message ?? `Codex Runners MCP request failed with ${response.status}`);
+    if (!response.ok) throw new Error(body.error?.message ?? `Agents Runners MCP request failed with ${response.status}`);
     return body;
   });
   await server.connect(new StdioServerTransport());
@@ -60,7 +60,7 @@ function objectResult(value: unknown): Record<string, unknown> {
 
 function descriptionFor(name: McpToolName): string {
   return ({
-    get_project: "Read the complete initialized Codex Runners project configuration.",
+    get_project: "Read the complete initialized Agents Runners project configuration.",
     get_board: "Read the current skill-flow board revision, columns, and issues.",
     get_ticket: "Read one issue by ID.",
     create_ticket: "Create a revision-protected issue (spec, ticket, or decision).",

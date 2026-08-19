@@ -11,6 +11,16 @@ export type SessionStartInput = {
   session_id?: string;
 };
 
+// Codex reads `additionalContext` at the top level; Claude Code reads it from
+// `hookSpecificOutput`. Emitting both keeps one hook handler valid in both.
+export type SessionStartOutput = {
+  additionalContext?: string;
+  hookSpecificOutput?: {
+    hookEventName: "SessionStart";
+    additionalContext: string;
+  };
+};
+
 export type SessionStartDependencies = {
   ensureDaemon(root: string): Promise<{ url: string; started: boolean }>;
   openBrowser(url: string): Promise<void>;
@@ -19,7 +29,7 @@ export type SessionStartDependencies = {
 export async function handleSessionStart(
   input: SessionStartInput,
   dependencies: SessionStartDependencies
-): Promise<{ additionalContext?: string }> {
+): Promise<SessionStartOutput> {
   const root = await findInitializedProject(input.cwd);
   if (!root) return {};
   const config = await new AtomicJsonStore(projectConfigPath(root), ProjectConfigSchema).load();
@@ -29,13 +39,16 @@ export async function handleSessionStart(
   // SessionStart; the existing tab stays connected over WebSocket.
   if (config.server.openBrowser && daemon.started) await dependencies.openBrowser(daemon.url);
 
+  const additionalContext = [
+    `Agents Runners is active for ${config.project.name}, driving ${config.agent.kind} runners.`,
+    "Donna is the persistent project manager for this project.",
+    "Call get_project and get_board before changing tickets, and use revision-protected MCP writes.",
+    "Backlog is inactive; actionable tickets are handled by persistent runners."
+  ].join(" ");
+
   return {
-    additionalContext: [
-      `Codex Runners is active for ${config.project.name}.`,
-      "Donna is the persistent project manager for this project.",
-      "Call get_project and get_board before changing tickets, and use revision-protected MCP writes.",
-      "Backlog is inactive; actionable tickets are handled by persistent runners."
-    ].join(" ")
+    additionalContext,
+    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext }
   };
 }
 

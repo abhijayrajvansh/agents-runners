@@ -5,6 +5,7 @@ export type TopBarProps = {
   projectName: string;
   projectId: string;
   branch: string;
+  agent: "codex" | "claude";
   view: "board" | "terminals";
   poolMaximums: Record<RoleName, number>;
   theme: "light" | "dark";
@@ -13,12 +14,14 @@ export type TopBarProps = {
   onCreate(): void;
 };
 
-export function TopBar({ projectName, projectId, branch, view, poolMaximums, theme, onSetPoolMaximum, onToggleTheme, onCreate }: TopBarProps) {
+const AGENT_LABELS = { codex: "Codex", claude: "Claude Code" } as const;
+
+export function TopBar({ projectName, projectId, branch, agent, view, poolMaximums, theme, onSetPoolMaximum, onToggleTheme, onCreate }: TopBarProps) {
   return (
     <header className="top-bar">
       <div className="brand-lockup">
-        <div className="brand-mark">CR</div>
-        <div><strong>Codex Runners</strong><span>{projectName} / {branch}</span></div>
+        <div className="brand-mark">AR</div>
+        <div><strong>Agents Runners</strong><span>{projectName} / {branch} · {AGENT_LABELS[agent]}</span></div>
       </div>
       <div className="top-actions">
         <nav className="view-switcher" aria-label="Project views">

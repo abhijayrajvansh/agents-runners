@@ -1,5 +1,15 @@
 import { z } from "zod";
 
+import type { AgentKind } from "../runners/agent-provider.js";
+
+// Which coding-agent CLI drives a runner. Set once per project, and overridable
+// per pool so one board can mix Codex and Claude Code runners.
+export const AgentKindSchema = z.enum(["codex", "claude"]);
+
+// Keeps the persisted vocabulary and the provider vocabulary from drifting.
+const _agentKindsAgree: AgentKind = "codex" satisfies z.infer<typeof AgentKindSchema>;
+void _agentKindsAgree;
+
 export const TicketStatusSchema = z.enum([
   "backlog",
   "needs_triage",
@@ -78,6 +88,7 @@ export const TicketSchema = z.object({
 
 const RolePoolSchema = z.object({
   max: z.number().int().min(0).max(20),
+  agent: AgentKindSchema.optional(),
   model: z.string().min(1).optional(),
   reasoningEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).optional(),
   instructions: z.string().default("")
@@ -97,13 +108,18 @@ export const ProjectConfigSchema = z.object({
     integrationBranch: z.string().min(1),
     remote: z.string().min(1).default("origin")
   }).strict(),
+  agent: z.object({
+    kind: AgentKindSchema.default("codex"),
+    command: z.string().min(1).optional()
+  }).strict().default({ kind: "codex" }),
   server: z.object({
     host: z.literal("127.0.0.1").default("127.0.0.1"),
     port: z.number().int().min(1024).max(65_535).default(4777),
     openBrowser: z.boolean().default(true)
   }).strict().default({ host: "127.0.0.1", port: 4777, openBrowser: true }),
   donna: z.object({
-    model: z.string().min(1).default("gpt-5.6-luna"),
+    agent: AgentKindSchema.optional(),
+    model: z.string().min(1).optional(),
     reasoningEffort: z.enum(["low", "medium", "high", "xhigh", "max", "ultra"]).default("low"),
     timeoutMs: z.number().int().min(5000).max(600_000).default(180_000)
   }).strict().optional(),
@@ -130,19 +146,19 @@ export const ProjectConfigSchema = z.object({
     actionableStatuses: [...actionableStatuses]
   }),
   pools: z.object({
-    developer: RolePoolSchema.default({ max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" }),
-    reviewer: RolePoolSchema.default({ max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" }),
-    qa: RolePoolSchema.default({ max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" })
+    developer: RolePoolSchema.default({ max: 5, reasoningEffort: "medium", instructions: "" }),
+    reviewer: RolePoolSchema.default({ max: 5, reasoningEffort: "medium", instructions: "" }),
+    qa: RolePoolSchema.default({ max: 5, reasoningEffort: "medium", instructions: "" })
   }).strict().default({
-    developer: { max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" },
-    reviewer: { max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" },
-    qa: { max: 5, model: "gpt-5.6-sol", reasoningEffort: "medium", instructions: "" }
+    developer: { max: 5, reasoningEffort: "medium", instructions: "" },
+    reviewer: { max: 5, reasoningEffort: "medium", instructions: "" },
+    qa: { max: 5, reasoningEffort: "medium", instructions: "" }
   }),
   worktrees: z.object({
-    root: z.string().min(1).default(".worktrees/codex-runners"),
+    root: z.string().min(1).default(".worktrees/agents-runners"),
     persistent: z.literal(true).default(true),
-    branchPrefix: z.string().min(1).default("codex-runners")
-  }).strict().default({ root: ".worktrees/codex-runners", persistent: true, branchPrefix: "codex-runners" }),
+    branchPrefix: z.string().min(1).default("agents-runners")
+  }).strict().default({ root: ".worktrees/agents-runners", persistent: true, branchPrefix: "agents-runners" }),
   environments: z.object({
     files: z.array(z.string().min(1)).default([".env", ".env.local", ".env.development"]),
     allowProduction: z.boolean().default(false),

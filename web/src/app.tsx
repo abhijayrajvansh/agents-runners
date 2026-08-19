@@ -20,7 +20,7 @@ export function App() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [donnaOpen, setDonnaOpen] = useState(true);
-  const [compactCards, setCompactCards] = useState(() => localStorage.getItem("codex-runners:compact-cards") !== "false");
+  const [compactCards, setCompactCards] = useState(() => localStorage.getItem("agents-runners:compact-cards") !== "false");
   const [theme, setTheme] = useState<"light" | "dark">(() => (
     document.documentElement.dataset.theme === "dark" ? "dark" : "light"
   ));
@@ -36,7 +36,7 @@ export function App() {
       "content",
       theme === "dark" ? "#171816" : "#ffffff"
     );
-    localStorage.setItem("codex-runners:theme", theme);
+    localStorage.setItem("agents-runners:theme", theme);
   }, [theme]);
 
   useEffect(() => {
@@ -92,6 +92,7 @@ export function App() {
         projectName={state.project.project.name}
         projectId={state.project.project.id}
         branch={state.project.project.integrationBranch}
+        agent={state.project.agent.kind}
         view={terminalView ? "terminals" : "board"}
         poolMaximums={{
           developer: state.project.pools.developer.max,
@@ -117,7 +118,7 @@ export function App() {
                 className="card-density-toggle"
                 aria-pressed={compactCards}
                 onClick={() => setCompactCards(current => {
-                  localStorage.setItem("codex-runners:compact-cards", String(!current));
+                  localStorage.setItem("agents-runners:compact-cards", String(!current));
                   return !current;
                 })}
               >
@@ -139,7 +140,7 @@ export function App() {
           <DonnaRail
             projectName={state.project.project.name}
             messages={state.donnaMessages}
-            model={state.project.donna?.model ?? "gpt-5.6-luna"}
+            model={state.project.donna?.model ?? ""}
             models={state.models}
             onModelChange={state.setDonnaModel}
             onSend={state.messageDonna}
@@ -184,5 +185,5 @@ function LoadingScreen() {
 }
 
 function ErrorScreen({ message, onRetry }: { message: string; onRetry(): void }) {
-  return <div className="state-screen state-screen--error"><AlertCircle size={24} /><h1>Codex Runners is unavailable</h1><p>{message}</p><button type="button" className="primary-button" onClick={onRetry}><RefreshCw size={15} />Try again</button></div>;
+  return <div className="state-screen state-screen--error"><AlertCircle size={24} /><h1>Agents Runners is unavailable</h1><p>{message}</p><button type="button" className="primary-button" onClick={onRetry}><RefreshCw size={15} />Try again</button></div>;
 }
