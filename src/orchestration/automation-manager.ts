@@ -437,5 +437,10 @@ function buildBlockerMessage(project: ProjectConfig, ticket: Ticket, findings: s
     const names = unfinishedDependencies.map(dependency => `**${dependency?.title ?? "Unknown ticket"}**`).join(", ");
     return `**${ticket.title}** is waiting for ${names}. It will resume automatically when ${unfinishedDependencies.length === 1 ? "that ticket is" : "those tickets are"} done.`;
   }
-  return `**${ticket.title}** needs your input: ${reason}\n\nDouble-click the ticket, enter your response, and save it to resume automatically.`;
+  const question = ticket.blocker?.question ?? `The runner stopped because “${reason}”. Should it retry with the current implementation?`;
+  const recommendation = ticket.blocker?.recommendedAction ?? "Retry the current stage using the safest non-destructive approach, then continue.";
+  const deadline = ticket.blocker?.autoResumeAt
+    ? `\n\nIf you do not respond by ${new Date(ticket.blocker.autoResumeAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}, I’ll apply that recommendation automatically.`
+    : "";
+  return `**${ticket.title}** needs your input: ${question}\n\n**Recommended:** ${recommendation}${deadline}\n\nDouble-click the ticket to answer now.`;
 }

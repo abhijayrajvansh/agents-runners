@@ -1,8 +1,9 @@
+import { randomUUID } from "node:crypto";
 import type { ProjectConfig, RoleName, Ticket, TicketStatus } from "../domain/types.js";
 import type { TicketRuntimeState, ProjectRuntimeRepository } from "../runtime/project-runtime.js";
 import type { EventBus } from "../server/event-bus.js";
 import type { ProjectRegistry } from "../server/project-registry.js";
-import { readableBlockerReason } from "./blockers.js";
+import { humanBlockerPrompt, readableBlockerReason } from "./blockers.js";
 import { nextStage } from "./state-machine.js";
 import type { RunnerPool, RunnerRecord } from "./runner-pool.js";
 
@@ -17,6 +18,11 @@ export type StageExecutionResult = {
   kind: "passed" | "failed" | "blocked";
   summary: string;
   findings: string[];
+  decision?: {
+    question: string;
+    recommendedAction: string;
+    timeoutMinutes?: number;
+  };
 };
 
 export interface StageExecutor {
@@ -260,9 +266,39 @@ export class Scheduler {
         return true;
       }
       if (ticket.blocker.kind === "human_input") {
+        if (ticket.blocker.autoResumeAt && Date.parse(ticket.blocker.autoResumeAt) <= Date.now()) {
+          const recommendation = ticket.blocker.recommendedAction ?? "Retry the current stage using the safest available approach.";
+          const runtime = this.dependencies.runtime.getTicket(projectId, ticket.id);
+          runtime.attempts = 0;
+          runtime.findings = [...runtime.findings, `Automatic recommendation approved: ${recommendation}`];
+          this.dependencies.runtime.setTicket(projectId, ticket.id, runtime);
+          await this.#updateTicket(projectId, ticket.id, {
+            status: "todo",
+            blocker: null,
+            comments: [...ticket.comments, {
+              id: `auto-decision-${randomUUID()}`,
+              author: "Automatic recommendation",
+              body: recommendation,
+              createdAt: new Date().toISOString()
+            }]
+          });
+          return true;
+        }
         const reason = readableBlockerReason(ticket.blocker.reason);
-        if (reason !== ticket.blocker.reason) {
-          await this.#updateTicket(projectId, ticket.id, { blocker: { ...ticket.blocker, reason } });
+        const isManualAbort = /^Aborted by the user\b/i.test(reason);
+        const prompt = humanBlockerPrompt(ticket.title, reason);
+        if (reason !== ticket.blocker.reason || (!isManualAbort && (!ticket.blocker.question || !ticket.blocker.recommendedAction || !ticket.blocker.autoResumeAt))) {
+          await this.#updateTicket(projectId, ticket.id, {
+            blocker: {
+              ...ticket.blocker,
+              reason,
+              ...(!isManualAbort && !ticket.blocker.question ? { question: prompt.question } : {}),
+              ...(!isManualAbort && !ticket.blocker.recommendedAction ? { recommendedAction: prompt.example } : {}),
+              ...(!isManualAbort && !ticket.blocker.autoResumeAt ? {
+                autoResumeAt: new Date(Date.now() + project.automation.humanInputTimeoutMinutes * 60_000).toISOString()
+              } : {})
+            }
+          });
           return true;
         }
       }
@@ -288,9 +324,18 @@ function blockerForResult(project: ProjectConfig, ticket: Ticket, result: StageE
     const names = unfinished.map(id => project.board.tickets.find(candidate => candidate.id === id)?.title ?? id);
     return { kind: "dependency", reason: `Waiting for ${names.join(", ")}` };
   }
+  const reason = readableBlockerReason(result.findings.find(finding => finding.trim()) ?? result.summary);
+  const fallback = humanBlockerPrompt(ticket.title, reason);
+  const timeoutMinutes = Math.min(
+    Math.max(result.decision?.timeoutMinutes ?? project.automation.humanInputTimeoutMinutes, 1),
+    1440
+  );
   return {
     kind: "human_input",
-    reason: readableBlockerReason(result.findings.find(finding => finding.trim()) ?? result.summary)
+    reason,
+    question: result.decision?.question ?? fallback.question,
+    recommendedAction: result.decision?.recommendedAction ?? fallback.example,
+    autoResumeAt: new Date(Date.now() + timeoutMinutes * 60_000).toISOString()
   };
 }
 

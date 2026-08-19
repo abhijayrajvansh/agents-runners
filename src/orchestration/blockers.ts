@@ -48,9 +48,9 @@ export function humanBlockerPrompt(title: string, reason: string): HumanBlockerP
     };
   }
   return {
-    question: `What should the runner do next for “${title}”?`,
-    guidance: "Give one clear decision: continue, retry, or change direction. Include any missing detail the runner needs.",
-    example: "Retry the current step using the existing implementation, then continue to review."
+    question: `The runner stopped because “${reason}”. Should it retry “${title}” with the current implementation?`,
+    guidance: "Approve the recommended recovery, or state the exact requirement or behavior that must change.",
+    example: `Retry “${title}” using the current acceptance criteria, choose the safest non-destructive option, and continue.`
   };
 }
 

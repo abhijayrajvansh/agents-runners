@@ -42,6 +42,9 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
   const needsHumanInput = ticket?.status === "blocked" && (ticket.blocker?.kind ?? (waitingForDependencies ? "dependency" : "human_input")) === "human_input";
   const blockerReason = readableBlockerReason(ticket?.blocker?.reason);
   const blockerPrompt = humanBlockerPrompt(ticket?.title ?? title, blockerReason);
+  const blockerQuestion = ticket?.blocker?.question ?? blockerPrompt.question;
+  const recommendedAction = ticket?.blocker?.recommendedAction ?? blockerPrompt.example;
+  const autoResumeAt = ticket?.blocker?.autoResumeAt;
   const editable = !ticket || ["backlog", "blocked", "done"].includes(ticket.status);
   const abortable = Boolean(ticket && ["todo", "in_progress", "review", "qa"].includes(ticket.status));
   const submit = async (event: FormEvent) => {
@@ -111,11 +114,15 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
               </div>
               <div className="human-input-panel__question">
                 <span>Question</span>
-                <strong>{blockerPrompt.question}</strong>
+                <strong>{blockerQuestion}</strong>
                 <p>{blockerPrompt.guidance}</p>
               </div>
-              <label>Your answer<textarea value={humanInput} onChange={event => setHumanInput(event.target.value)} rows={4} placeholder={blockerPrompt.example} required /></label>
-              <small>Example: {blockerPrompt.example}</small>
+              <div className="human-input-panel__recommendation">
+                <span>Recommended solution</span>
+                <strong>{recommendedAction}</strong>
+                {autoResumeAt && <p>If you do not answer by {formatDecisionDeadline(autoResumeAt)}, Codex Runners will apply this recommendation automatically.</p>}
+              </div>
+              <label>Your answer<textarea value={humanInput} onChange={event => setHumanInput(event.target.value)} rows={4} placeholder={recommendedAction} required /></label>
               <small>Saving your response moves this ticket to Todo and resumes its persistent agent automatically.</small>
             </div>
           )}
@@ -129,4 +136,10 @@ export function TicketDrawer({ open, ticket, tickets, runners, onClose, onSave, 
       </aside>
     </div>
   );
+}
+
+function formatDecisionDeadline(value: string): string {
+  const deadline = new Date(value);
+  if (Number.isNaN(deadline.getTime())) return "the decision deadline";
+  return deadline.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 }

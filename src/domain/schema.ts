@@ -21,7 +21,10 @@ export const TicketCommentSchema = z.object({
 
 export const TicketBlockerSchema = z.object({
   kind: z.enum(["dependency", "human_input"]),
-  reason: z.string().min(1)
+  reason: z.string().min(1),
+  question: z.string().min(1).optional(),
+  recommendedAction: z.string().min(1).optional(),
+  autoResumeAt: z.iso.datetime().optional()
 }).strict();
 
 export const TicketSchema = z.object({
@@ -82,6 +85,7 @@ export const ProjectConfigSchema = z.object({
     enabled: z.boolean().default(true),
     fullAccess: z.boolean().default(true),
     maxRetries: z.number().int().min(0).max(10).default(3),
+    humanInputTimeoutMinutes: z.number().int().min(1).max(1440).default(10),
     autoMerge: z.boolean().default(false),
     autoPush: z.boolean().default(true),
     actionableStatuses: z.array(TicketStatusSchema).default([...actionableStatuses])
@@ -89,6 +93,7 @@ export const ProjectConfigSchema = z.object({
     enabled: true,
     fullAccess: true,
     maxRetries: 3,
+    humanInputTimeoutMinutes: 10,
     autoMerge: false,
     autoPush: true,
     actionableStatuses: [...actionableStatuses]

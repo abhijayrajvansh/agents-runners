@@ -44,6 +44,7 @@ Change either value in `.codex-runners/config.json`. Existing Donna threads are 
 | `automation.enabled` | `true` | Reconcile actionable tickets automatically |
 | `automation.fullAccess` | `true` | Run worker Codex turns without sandbox or approval pauses |
 | `automation.maxRetries` | `3` | Review/QA fix loops before Blocked |
+| `automation.humanInputTimeoutMinutes` | `10` | Minutes before a safe recommended blocker decision is applied automatically |
 | `automation.autoMerge` | `false` | Legacy compatibility field; final merges always require the Done-card button |
 | `automation.autoPush` | `true` | Push ticket delivery branches and user-approved integration results |
 | `automation.actionableStatuses` | Todo, In Progress, Review, QA | States that wake runners |
@@ -53,6 +54,8 @@ Set `automation.enabled` to `false` to keep the board readable without starting 
 Development, review, QA, and repair loops run automatically. A QA-passed ticket is sealed to its own delivery branch and moved to Done. Only the **Merge to `<integrationBranch>`** button integrates it; after a successful verified merge, Codex Runners deletes that ticket delivery branch locally and remotely. Dependent tickets wait until the prerequisite is merged, not merely QA-passed.
 
 Ticket details are editable only in Backlog, Blocked, and Done. Todo, In Progress, Review, and QA tickets are read-only while agents own them. Their drawer exposes an emergency **Abort process** button that interrupts and unassigns active runners, clears the explicit assignment, and moves the ticket to Blocked for human instructions.
+
+When a runner genuinely needs a decision, it must record the exact question and a safe recommended answer. The Blocked drawer shows both and the response deadline. If nobody answers before `automation.humanInputTimeoutMinutes`, the heartbeat records the recommendation as decision input, moves the ticket back to Todo, and resumes delivery. Emergency user-aborted tickets never auto-resume.
 
 ## Runner pools
 

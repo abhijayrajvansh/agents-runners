@@ -79,7 +79,7 @@ function execution(): StageExecution {
     version: 1,
     project: { id: "demo", name: "Demo", repositoryRoot: "/tmp/demo", integrationBranch: "dev", remote: "origin" },
     board: { revision: 0, tickets: [] },
-    automation: { enabled: true, fullAccess: true, maxRetries: 3, autoMerge: true, autoPush: true, actionableStatuses: ["todo", "in_progress", "review", "qa"] },
+    automation: { enabled: true, fullAccess: true, maxRetries: 3, humanInputTimeoutMinutes: 10, autoMerge: true, autoPush: true, actionableStatuses: ["todo", "in_progress", "review", "qa"] },
     pools: {
       developer: { max: 5, instructions: "" },
       reviewer: { max: 5, instructions: "" },

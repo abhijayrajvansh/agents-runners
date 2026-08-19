@@ -25,6 +25,7 @@ export function projectConfig(overrides: Partial<ProjectConfig> = {}): ProjectCo
       enabled: true,
       fullAccess: true,
       maxRetries: 3,
+      humanInputTimeoutMinutes: 10,
       autoMerge: false,
       autoPush: true,
       actionableStatuses: ["todo", "in_progress", "review", "qa"]

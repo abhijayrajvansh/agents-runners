@@ -93,7 +93,8 @@ export function parseStageResult(message: string): StageExecutionResult {
       if (!outcome) continue;
       const summary = typeof parsed.summary === "string" ? parsed.summary : "Stage completed";
       const findings = normalizeFindings(parsed.findings);
-      return { kind: outcome, summary, findings };
+      const decision = normalizeDecision(parsed);
+      return { kind: outcome, summary, findings, ...(decision ? { decision } : {}) };
     } catch {
       // Codex may include prose before its structured final line.
     }
@@ -102,6 +103,25 @@ export function parseStageResult(message: string): StageExecutionResult {
     kind: "blocked",
     summary: "Runner did not return a valid structured result",
     findings: message ? [message] : ["No final runner message was returned."]
+  };
+}
+
+function normalizeDecision(parsed: Record<string, unknown>): StageExecutionResult["decision"] | undefined {
+  const nested = parsed.decision && typeof parsed.decision === "object"
+    ? parsed.decision as Record<string, unknown>
+    : parsed;
+  const question = typeof nested.question === "string" ? nested.question.trim() : "";
+  const recommendedAction = typeof nested.recommendedAction === "string"
+    ? nested.recommendedAction.trim()
+    : typeof nested.recommendation === "string"
+      ? nested.recommendation.trim()
+      : "";
+  if (!question || !recommendedAction) return undefined;
+  const timeout = nested.timeoutMinutes;
+  return {
+    question,
+    recommendedAction,
+    ...(typeof timeout === "number" && Number.isFinite(timeout) ? { timeoutMinutes: Math.round(timeout) } : {})
   };
 }
 

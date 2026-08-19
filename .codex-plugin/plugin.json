@@ -1,6 +1,6 @@
 {
   "name": "codex-runners",
-  "version": "0.1.0+codex.20260819090004",
+  "version": "0.1.0+codex.20260819090005",
   "description": "Run a local realtime Kanban board with Donna and persistent autonomous Codex development, review, and QA pools.",
   "author": {
     "name": "Abhijay Rajvansh"

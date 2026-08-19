@@ -24,8 +24,8 @@ export function buildStagePrompt(
       "Do not edit code. Return failed with reproducible findings when validation fails."
     ]
   }[runner.role];
-  const humanInput = ticket.comments
-    .filter(comment => comment.author === "Human input")
+  const decisionInput = ticket.comments
+    .filter(comment => comment.author === "Human input" || comment.author === "Automatic recommendation")
     .map(comment => `- ${comment.body}`)
     .join("\n");
   return [
@@ -34,11 +34,12 @@ export function buildStagePrompt(
     ticket.description,
     `Acceptance criteria:\n${ticket.acceptanceCriteria.map(item => `- ${item}`).join("\n") || "- Complete the described work."}`,
     runtime.findings.length ? `Findings to address:\n${runtime.findings.map(item => `- ${item}`).join("\n")}` : "",
-    humanInput ? `Human input received:\n${humanInput}` : "",
+    decisionInput ? `Decision input received:\n${decisionInput}` : "",
     ticket.developmentInstructions,
     ticket.qaInstructions,
     project.pools[runner.role].instructions,
     ...roleInstructions,
-    "Use Codex Runners MCP progress tools while working. Return a final JSON object with outcome, summary, and findings. Outcome must be exactly passed, failed, or blocked."
+    "Use Codex Runners MCP progress tools while working. Return a final JSON object with outcome, summary, and findings. Outcome must be exactly passed, failed, or blocked.",
+    "If outcome is blocked, also return decision with: question (the exact concrete question a human must answer), recommendedAction (the safest specific answer you will use automatically), and timeoutMinutes. Never ask a generic question such as what to do next. State the precise missing choice, value, or behavior. Do not recommend production secrets or destructive actions."
   ].filter(Boolean).join("\n\n");
 }
